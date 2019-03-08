@@ -56,6 +56,6 @@ and particles moved  between groups as and when required.
 
 setpso can be used in low level coding and the higher level run management is provided
 by the psokit toolkit package in
-    import "github/mthrgo/setpso/psokit
+    import "github.com/mthrgo/setpso/psokit
 */
 package setpso
