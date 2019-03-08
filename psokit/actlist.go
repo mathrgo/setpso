@@ -218,12 +218,13 @@ type CmdOptions struct{}
 func (cmd *CmdOptions) Init(man *ManPso) {
 	var optCase, funCase string
 	var dbug, listFun, listPso, listAct bool
-	var stopAt, nruns int
+	var stopAt, nrun, npart int
 	flag.StringVar(&optCase, "pso", man.PsoCase(), "name of PSO")
 	flag.StringVar(&funCase, "fun", man.FunCase(), "name of function to optimise")
 	flag.BoolVar(&dbug, "dump", man.DebugDump(), "set to true when debug dumping")
 	flag.IntVar(&stopAt, "dbstop", man.StopAt(), "cycle to stop at when doing a debug dump")
-	flag.IntVar(&nruns, "runs", man.Nruns(), "number of independent runs when not debug dumping")
+	flag.IntVar(&nrun, "nrun", man.Nrun(), "number of independent runs when not debug dumping")
+	flag.IntVar(&npart, "npart", man.Npart(), "number of independent runs when not debug dumping")
 	flag.BoolVar(&listFun, "listf", false, "list available cost-function")
 	flag.BoolVar(&listPso, "listp", false, "list available SPSO")
 	flag.BoolVar(&listAct, "lista", false, "list available Actions")
@@ -244,20 +245,30 @@ func (cmd *CmdOptions) Init(man *ManPso) {
 		fmt.Print(man.FunDescription())
 		os.Exit(1)
 	}
+	man.SetNrun(nrun)
+	man.SetNpart(npart)
+
 	if dbug {
 		man.SetDebugDump(true)
 		man.SetStopAt(stopAt)
-		man.SetNruns(1)
+		man.SetNrun(1)
 	} else {
 		man.SetDebugDump(false)
 	}
+	done := false
 	if listFun {
 		fmt.Println(man.FunDescription())
+		done = true
 	}
 	if listPso {
 		fmt.Println(man.PsoDescription())
+		done = true
 	}
 	if listAct {
 		fmt.Println(man.ActDescription())
+		done = true
+	}
+	if done {
+		os.Exit(0)
 	}
 }

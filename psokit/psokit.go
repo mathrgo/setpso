@@ -130,7 +130,7 @@ type ManPso struct {
 	// true when detailed output to file is used
 	dbug bool
 	// number of runs
-	nruns int
+	nrun int
 	// number of particles in SPSO instance
 	npart int
 	// cost function seed gain against run id
@@ -169,7 +169,7 @@ func NewMan() *ManPso {
 	man.dbug = false
 	man.ndata = 1200
 	man.nthink = 300
-	man.nruns = 1
+	man.nrun = 1
 	man.npart = 10
 	man.funSeed1 = 0
 	man.funSeed0 = 3142
@@ -205,7 +205,7 @@ func (man *ManPso) String() string {
 	if man.dbug {
 		s += fmt.Sprintf("Detailed debug for %d iterations\n", man.stopAt)
 	}
-	s += fmt.Sprintf("Number of Runs = %d \t", man.nruns)
+	s += fmt.Sprintf("Number of Runs = %d \t", man.nrun)
 	s += fmt.Sprintf("Number of Particles = %d\n", man.npart)
 	s += fmt.Sprintf("Max number of data coms in a run = %d\n", man.ndata)
 	s += fmt.Sprintf("Thinking interval between data coms = %d\n", man.nthink)
@@ -253,11 +253,11 @@ func (man *ManPso) SetDebugDump(db bool) { man.dbug = db }
 //DebugDump returns true when detailed output to file is used.
 func (man *ManPso) DebugDump() bool { return man.dbug }
 
-//SetNruns sets Nruns.
-func (man *ManPso) SetNruns(n int) { man.nruns = n }
+//SetNrun sets Nrun.
+func (man *ManPso) SetNrun(n int) { man.nrun = n }
 
-//Nruns returns number of runs.
-func (man *ManPso) Nruns() int { return man.nruns }
+//Nrun returns number of runs.
+func (man *ManPso) Nrun() int { return man.nrun }
 
 //SetNpart sets Npart.
 func (man *ManPso) SetNpart(n int) { man.npart = n }
@@ -295,7 +295,7 @@ func (man *ManPso) SetFunSeed(sd0, sd1 int64) {
 
 /*
 Run runs the chosen SPSO using the chosen cost-function and settings in man for
-Nruns() runs. Each run starts with a new cost-function and SPSO with different
+Nrun() runs. Each run starts with a new cost-function and SPSO with different
 but computed random number seeds to aim at making each run independent of other
 runs in the sequence thus making it easy to generate  moderately unbiased
 performance statistics.
@@ -306,7 +306,7 @@ func (man *ManPso) Run() {
 	for i := range man.actInit {
 		man.actInit[i].Init(man)
 	}
-	for man.runid = 0; man.runid < man.nruns; man.runid++ {
+	for man.runid = 0; man.runid < man.nrun; man.runid++ {
 		man.iter = 0
 		man.Init()
 		for i := range man.actRunInit {
