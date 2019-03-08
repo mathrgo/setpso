@@ -117,7 +117,7 @@ source tree by typing
 
     go get github.com/mathrgo/setpso
 
-documentation is given in https://godoc/github.com/mathrgo/setpso
+documentation is given in https://godoc.org/github.com/mathrgo/setpso
 
 however you can run the documentation live as a local web page by typing
 
