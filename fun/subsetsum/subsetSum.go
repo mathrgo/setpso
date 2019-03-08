@@ -78,7 +78,7 @@ func (f *Fun) MaxLen() int {
 }
 
 // ToConstraint uses the previous parameter pre and the updating hint parameter
-// to attempt to produce an update to pre which satisfies solution constraints
+// to attempt to produce an update to hint which satisfies solution constraints
 // and returns valid = True if succeeds
 func (f *Fun) ToConstraint(pre, hint *big.Int) (valid bool) {
 	valid = true
