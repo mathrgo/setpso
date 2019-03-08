@@ -24,6 +24,9 @@ An example of its use is given in the setpso subdirectory
     setpso/example/runkit1
 This includes the command line option reader Action. When run without arguments
 command line option help is displayed together with the list of available Actions.
+to do a single run try
+    go run runkit1.go -nrun 1
+in the runkit1 directory.
 
 */
 package psokit

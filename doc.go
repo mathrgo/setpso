@@ -56,6 +56,10 @@ and particles moved  between groups as and when required.
 
 setpso can be used in low level coding and the higher level run management is provided
 by the psokit toolkit package in
-    import "github.com/mthrgo/setpso/psokit
+    import "github.com/mathrgo/setpso/psokit"
+you can quickly get to run an example by going to the setpso/example/runkit1
+directory in a terminal then execute
+    go run runkit1.go -nrun 1
+
 */
 package setpso
