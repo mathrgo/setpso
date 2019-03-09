@@ -1,13 +1,12 @@
 /*
 Package setpso is a collection of Set based Particle Swarm Optimisers(SPSO)
 designed for cost functions that map binary patterns to *big.Int cost values.
-The binary patterns called Parameters is encoded also as a *big.Int. The SPSO
-is a swarm of entities called Particles that together iteratively hunt for
-better solutions. The update iteration of the swarm mimics the spirit of the
-continuous case and is based on set operations. It also includes experimental
-enhancements to improve the discrete case. For brief introduction, context of
-use and planned future development read the Readme  file at
-   github.com/mathrgo/setpso/readme.md
+The binary patterns called Parameters is encoded also as a *big.Int. The SPSO is
+a swarm of entities called Particles that together iteratively hunt for better
+solutions. The update iteration of the swarm mimics the spirit of the continuous
+case and is based on set operations. It also includes experimental enhancements
+to improve the discrete case. For brief introduction, context of use and planned
+future development read the Readme  file at https://github.com/mathrgo/setpso
 
 
 Particle's Personal-best
