@@ -4,7 +4,7 @@ experimental Set-based Particle Swarm Optimisers (SPSOs) in the package setpso.
 These SPSOs are used to find good and often optimal cost minimising subsets
 where the cost is a function of subsets of a finite collection of items, where
 the cost is a big integer so that in principle large and combinatorial difficult
-problems can be looked at. Please read  https://github/mathrgo/setpso/readme.md
+problems can be looked at. Please read  https://github.com/mathrgo/setpso/readme.md
 to give background information  followed by the godoc documentation.
 
 The main toolkit interface is ManPso; its instance is usually refered to as man

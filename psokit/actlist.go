@@ -87,7 +87,7 @@ func (man *ManPso) ActDescription() string {
 
 /*
 Presult  used as the
-Action print-result
+Action, print-result
 */
 type Presult struct{}
 
@@ -99,7 +99,7 @@ func (a *Presult) Result(man *ManPso) {
 }
 
 /*
-Pheading used as the Action print-headings
+Pheading used as the Action, print-headings
 */
 type Pheading struct{}
 
@@ -180,6 +180,7 @@ func (r *ResultsArray) NewPlot(yname, title string, runid int) {
 }
 
 //PlotPersonalBest plots the personal best costs of each  Particle during a run.
+// It implements the plot-personal-best Action.
 type PlotPersonalBest struct {
 	*ResultsArray
 }
@@ -208,7 +209,7 @@ func (pl *PlotPersonalBest) Result(man *ManPso) {
 }
 
 /*
-CmdOptions is the implementation of the Action use-cmd-options. It provides
+CmdOptions is the implementation of the Action, use-cmd-options. It provides
 the ability to change some of the man options using the command line. if no CmdOptions
 are chosen it prints out a list of defaults together with a list of Action names.
 */

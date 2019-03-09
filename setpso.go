@@ -53,7 +53,9 @@ type Fun interface {
 	MaxLen() (maxlen int)
 	// string giving a description of the cost function
 	About() (s string)
-	// this attempts to  give a constraint satisfying pre that matches the hint
+	// this attempts to  give a constraint satisfying hint that matches the hint;
+	// pre is the previous constraint satisfying version to hint, which
+	// should not be changed
 	ToConstraint(pre, hint *big.Int) bool
 	// this requests the function to give a meaningful interpretation of
 	// z as a Parameters subset for the function assuming z satisfies constraints
@@ -237,7 +239,7 @@ func NewPso(n int, fun Fun,
 /*UpdateGroup does housekeeping for the group k
 it calculates the best cost and the particle in group that gives this.
 Note that it looks for the best in the current iteration and disregards historic
- best costs even if they were better.
+best costs even if they were better.
 */
 func (pso *Pso) UpdateGroup(g *Group) {
 	g.bestCost.Set(pso.maxN)
@@ -320,9 +322,10 @@ func CardinalSize(x *big.Int) (card int) {
 	return
 }
 
-/*RandomSubset converts z to a subset of z by using a probability p for
-  selecting each member of z as a set. the updated z is returned using the pso
-  random number generator.
+/*
+RandomSubset converts z to a subset of z by using a probability p for
+selecting each member of z as a set. the updated z is returned using the pso
+random number generator.
 */
 func RandomSubset(z *big.Int, p float64, rnd *rand.Rand) *big.Int {
 	n := z.BitLen()

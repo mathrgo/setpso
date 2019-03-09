@@ -13,7 +13,7 @@ import (
 /*
 SelectFun informs man to consider using the named cost-function instance, name.
 it checks that there exists an instance creator and returns an error if it does
-not exist. There is no need to add a cost-function  with if you are using an
+not exist. There is no need to add a cost-function if you are using an
 inbuilt instance name.
 */
 func (man *ManPso) SelectFun(name string) error {
