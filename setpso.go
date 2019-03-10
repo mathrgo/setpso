@@ -360,10 +360,11 @@ BlurTarget blurs the target set displacement based on its CardinalSize. Normally
 x is the exclusive or of a particle Parameters with a target Local-best
 Parameters. The blur is effected indirectly  by pseudo adding a probability
 
-  pb =l*CardinalSize(x)+l0
+  pb =rand*(l*CardinalSize(x)+l0)/MaxLen()
 
 to each component of the Velocity;l,l0 corresponds to the Lfactor, Loffset
-heuristics.
+heuristics;MaxLen() is the maximum number of set items ;rand is a random number
+between 0 and 1.
 */
 func (pso *Pso) BlurTarget(x *big.Int, id int, l, l0 float64) {
 	h := l*float64(CardinalSize(x)) + l0
