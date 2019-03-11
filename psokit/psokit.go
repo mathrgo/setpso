@@ -33,7 +33,7 @@ must have the appropriate methods to indicate where it will be used in a run
 sequence. the supported interfaces are:
 		ActInit // pre runs Action
 		ActRunInit // pre run Action
-		ActData  // post iteration Action
+		ActUpdate  // post iteration Action
 		ActData  // data interface Action ocurring every Nthink() iterations
 		ActResult // post run Action
 		ActSummary // post runs Action
