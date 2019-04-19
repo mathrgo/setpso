@@ -8,13 +8,27 @@ case and is based on set operations. It also includes experimental enhancements
 to improve the discrete case. For brief introduction, context of use and planned
 future development read the Readme  file at https://github.com/mathrgo/setpso
 
+Relation to Other Sub Packages
 
-Particle's Personal-best
+ Package setpso lives in a directory that is at the top of a a hierarchy of
+ packages.
 
-While exploring Parameters for finding reduced cost as returned by the
-independent cost function the Particle keeps a record of the personal best
-Parameter achieved so far called Personal-best with a corresponding best cost.
-The Personal-best status is checked after each update.
+ Package setpso contains two working SPSOs: GPso and CLPso that depend on Pso
+ for all interfaces except Update() needed in package psokit.
+
+ Packages in setpso/fun is where cost-functions that interface with Pso are
+ usually placed and includes any helper packages for such cost-functions.
+
+ Package psokit enables a high level multiple run interface where elements for
+ the rum are referred by name to be used in setting up runs of various SPSOs and
+ cost-function combinations and searching for good heuristics.
+
+ Particle's Personal-best
+
+ While exploring Parameters for finding reduced cost as returned by the
+ independent cost function the Particle keeps a record of the personal best
+ Parameter achieved so far called Personal-best with a corresponding best cost.
+ The Personal-best status is checked after each update.
 
 Particle's Update Velocity
 
