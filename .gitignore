@@ -1,0 +1,9 @@
+doc/psoForML.aux
+doc/psoForML.bbl
+doc/psoForML.blg
+doc/psoForML.log
+.vscode/settings.json
+doc/.DS_Store
+doc/psoForML.synctex.gz
+example/.DS_Store
+fun/.DS_Store
