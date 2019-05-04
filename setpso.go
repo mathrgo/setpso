@@ -66,7 +66,7 @@ type Fun interface {
 
 /*
 PsoInterface is the interface used with the PSO  and its variants. Normally
-Pso supplies this apart from the Udate() function. The interface is used by
+Pso supplies this apart from the Update() function. The interface is used by
 the monitoring and running program  and psokit uses this interface to provide
 useful plotting functions.
 */
@@ -83,7 +83,7 @@ type PsoInterface interface {
 	Params(i int) *big.Int
 	// Local-best cost of the ith Particle
 	LocalBestCost(i int) *big.Int
-	// Local-best Prameters of the ith Particle
+	// Local-best Parameters of the ith Particle
 	LocalBestParameters(i int) *big.Int
 	// interface for requesting debug output based on cmd
 	PrintDebug(w io.Writer, cmd string)
@@ -172,15 +172,16 @@ func (pso *Pso) NominalL() (l float64) {
 	return a1 * a3 / (math.Pow(float64(pso.n), a2) * math.Pow(float64(pso.maxLen), a4))
 }
 
-/*NewPso sets up a PSO with a swarm of n particles. fun is the costing function
-* interface. Each Particle has a big integer Parameter. To initialise the
-* parameter set values are uniformly randomly chosen with integer values upto
-* Func.MaxLen(); ToConstraint() is used on these random choices with repeated
-* use  of random choice until each Particle has an initial Parameters that
-* satisfies the cost function  constraints on the Parameters. Default heuristics
-* are applied  to the "root" Group and all particles are added to this group.
-* The PSO uses the random generator seed sd.
- */
+/*
+NewPso sets up a PSO with a swarm of n particles. fun is the costing function
+interface. Each Particle has a big integer Parameter. To initialise the
+parameter set values are uniformly randomly chosen with integer values up to
+Func.MaxLen(); ToConstraint() is used on these random choices with repeated
+use  of random choice until each Particle has an initial Parameters that
+satisfies the cost function  constraints on the Parameters. Default heuristics
+are applied  to the "root" Group and all particles are added to this group.
+The PSO uses the random generator seed sd.
+*/
 func NewPso(n int, fun Fun,
 	sd int64) *Pso {
 	var pso Pso
@@ -214,11 +215,11 @@ func NewPso(n int, fun Fun,
 		p.group = g
 		p.params = big.NewInt(0)
 		p.hint = big.NewInt(0)
-		//serch for state that satisfies function constraints
-		serching := true
-		for serching {
+		//search for state that satisfies function constraints
+		searching := true
+		for searching {
 			p.hint.Rand(pso.rnd, maxN)
-			serching = !pso.fun.ToConstraint(p.params, p.hint)
+			searching = !pso.fun.ToConstraint(p.params, p.hint)
 		}
 		p.params.Set(p.hint)
 		p.cost = big.NewInt(0)
@@ -378,7 +379,7 @@ func (pso *Pso) BlurTarget(x *big.Int, id int, l, l0 float64) {
 
 /*
 SetParams sets the parameters of the id th particle updating  the resulting
-cost and  personal best case. It also reevaluates the personal best cost in
+cost and  personal best case. It also revaluates the personal best cost in
 case the function has changed.
 */
 func (pso *Pso) SetParams(id int) {
@@ -457,8 +458,8 @@ func (pso *Pso) PUpdate() {
 		// add personal best velocity contribution
 		pso.setTempVel(pso.temp, rp)
 		for t := range g.targets {
-			targ := g.targets[t]
-			pso.temp.Xor(pso.Pt[targ].bestParams, p.params)
+			target := g.targets[t]
+			pso.temp.Xor(pso.Pt[target].bestParams, p.params)
 			pso.BlurTarget(pso.temp, k, l, l0)
 			rg := Phi * pso.rnd.Float64()
 			if rg > 1 {
@@ -555,7 +556,7 @@ type PsoHeuristics struct {
 	Omega float64
 	// for target blur factor (0.15)
 	Lfactor float64
-	// for taret blur offset (2.0)
+	// for target blur offset (2.0)
 	Loffset float64
 	// for a minimum number of tries before doing something different(100)
 	TryGap int
@@ -584,11 +585,11 @@ func (g *Group) Heuristics() (hu *PsoHeuristics) {
 SetGroupHeuristics sets the heuristics for the group g. As the Pso undergoes
 development additional heuristic parameters can be introduced with compatible
 defaults without destroying backwards compatibility with previous versions that
-do not have the extra heuristics. Not that only a link to the huristics is
+do not have the extra heuristics. Not that only a link to the heuristics is
 passed so the heuristics can be changed outside the group with many groups
 referring to the  same heuristics.
 
-All group heuristics are derived, normaly by just a pointer, from a master
+All group heuristics are derived, normally by just a pointer, from a master
 heuristics stored in pso, so often all heuristics  can be changed via the master
 heuristic; how this is done should be through calling SetHeuristic() for the
 derived SPSO.
@@ -597,7 +598,7 @@ func (pso *Pso) SetGroupHeuristics(g *Group, h *PsoHeuristics) {
 	g.hu = h
 }
 
-// SetGroupTarget sets the first fiew Targets of group 'grp'
+// SetGroupTarget sets the first few Targets of group 'grp'
 // to the particle list targetList.
 func (pso *Pso) SetGroupTarget(grp *Group, targetList ...int) {
 	copy(grp.targets, targetList)
@@ -694,7 +695,7 @@ func (p *CLPso) SetHeuristics(hu PsoHeuristics) { p.hu = hu }
 
 /*
 Update does the iteration update. For each Particle a check is made to see if
-the updates have not given an improvement in cost of the Parametrs compared to
+the updates have not given an improvement in cost of the Parameters compared to
 the last improvement for at least TryGap iterations. If so it looks for an
 alternative target with probability pc=Pc0(). If it looks for an alternative
 target it randomly selects two Particles and chooses the one  that gives the
@@ -759,9 +760,9 @@ func (pso *Pso) PrintDebug(w io.Writer, id string) {
 	case "Pt":
 		for i := range pso.Pt {
 			p := &pso.Pt[i]
-			fmt.Fprintf(w, "%d bcost= %v\n", i, p.best)
-			fmt.Fprintf(w, "bparam = %s\n", p.bestParams.Text(2))
-			fmt.Fprintf(w, "xparam = %s\n", p.params.Text(2))
+			fmt.Fprintf(w, "%d bestcost= %v\n", i, p.best)
+			fmt.Fprintf(w, "bestparam = %s\n", p.bestParams.Text(2))
+			fmt.Fprintf(w, "param = %s\n", p.params.Text(2))
 		}
 	case "vel":
 

@@ -7,12 +7,13 @@ the cost is a big integer so that in principle large and combinatorial difficult
 problems can be looked at. Please read  https://github.com/mathrgo/setpso
 to give background information  followed by the godoc documentation.
 
-The main toolkit interface is ManPso; its instance is usually refered to as man
-which manages the sequence of runs to get some impression of how the SPSO
-performs with the chosen  cost function with Actions that are available for
-monitoring the runs. All these  components are chosen by name using various
-Select methods.  There are short descriptions agains each name and the toolkit
-provides methods for  for listing the names and their associated descriptions.
+The main toolkit interface is ManPso; its instance is usually referred to as
+man which manages the sequence of runs to get some impression of how the
+chosen SPSO performs with the chosen cost function with Actions that are
+available for monitoring the runs. All these components
+(SPSO,Function,Actions) are chosen by name using various Select methods. There
+are short descriptions against each name and the toolkit provides methods for
+listing the names and their associated descriptions.
 
 As well as inbuilt components there is an interface to generate new component
 creators together with their names and brief descriptions which can be moved to
@@ -27,6 +28,5 @@ command line option help is displayed together with the list of available Action
 to do a single run try
     go run runkit1.go -nrun 1
 in the runkit1 directory.
-
 */
 package psokit

@@ -75,7 +75,7 @@ _algorithms_ that fit criteria so the SPSO can be used to find its own
 expressions for heuristic values and target choice by using a bootstrap process.
 
 4. Support for a Cost-function  that changes, but infrequently, so the personal
-best cost has to be  reevaluated from time to time. This could for instance
+best cost has to be  re-evaluated from time to time. This could for instance
 include the Cost-function replacing a set item  that is never used to give a low
 cost by another item that was not in the original set of items which may
 result in improved cost resulting in changing the items properties. As part of this
@@ -91,14 +91,14 @@ these good solutions to produce better ones - a crude form of subroutines.
 
 
 6. The process of setting up batch runs and testing involves similar processes over
-and over again so a toolkit will be produced to simplify this. The toolkit will
-have a list of cost-functions and SPSO variants to try in a mega toolkit as well
+and over again so a tool kit will be produced to simplify this. The tool kit will
+have a list of cost-functions and SPSO variants to try in a mega tool kit as well
 as a stripped down version where one can build in cases of interest.
 
-7. The toolkit will have various monitoring options and functions to enable new
+7. The tool kit will have various monitoring options and functions to enable new
 components to be introduced as well as new SPSOs and cost-functions.
 
-8. To support the toolkit all SPSOs will have to meet a golang interface specified
+8. To support the tool kit all SPSOs will have to meet a golang interface specified
 in the `setpso` package. Likewise for all cost-functions and monitoring
 components.    
 
@@ -106,33 +106,42 @@ Getting Started
 ===============
 golang is a Google programming language that appears to be suited for developing
 SPSOs. ensure you have a copy by going to [golang](https://golang.org) and down
-loading it. Also choose your favourite IDE. the current code was developed using
-the Atom editor with Atom packages:
+loading it. 
+
+To help choose your favourite IDE. the current code was partially developed using ATOM with Atom packages:
 
     go-plus  go-debug go-signature-statusbar pdf-view platformio-ide-terminal
     split-diff svg-preview language-go markdown-preview spell-check
 
-Next open a terminal and get this package and download it to your computer go
-source tree by typing
+since then the development has switched to Visual Studio Code at https://code.visualstudio.com  which is the preferred IDE.
 
-    go get github.com/mathrgo/setpso
+The following instructions are for quickly getting a working example using a command line at a terminal: 
 
+Open a terminal and clone get this package to your computer by going to an empty directory and typing 
+
+    git clone https://github.com/mathrgo/setpso .
+
+now move to the subdirectory
+
+    example/runkit1
+
+and type
+
+    go run runkit1.go
+
+this will give you a set of command options to use
+
+to do a single default run type
+
+    go run runkit1.go -nrun 1
+
+This may not mean that much at this point but you have  found a solution to the subset sum problem of 100 items with element items randomly chosen from 20 bit positive integers.
+
+Documentation
+=============
 documentation is given in https://godoc.org/github.com/mathrgo/setpso
 
-however you can run the documentation live as a local web page by typing
-
-    godoc -http :8000 &
-
-and view it in a browser at
-
-    localhost:8000
-
-this should provide a general help and the help on setpso  will be under
-packages in a subfolder
-
-    github.com/mathrgo/setpso
-
+This documentation is hierarchical in nature giving information on each package and is worth reading to understand the packages starting with setpso.
+ 
 follow the instructions and example for running GPso and CLPso .
-The examples are in
 
-    github.com/mathrgo/setpso/example
