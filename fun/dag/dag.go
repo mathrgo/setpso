@@ -171,7 +171,7 @@ func (f *Fun) Idecode(a big.Int) {
 	}
 }
 
-// MaxLen returns the number of elements in the subset sum problem
+// MaxLen returns the number of elements
 func (f *Fun) MaxLen() int {
 	return f.nNode * (2*f.nBitsLookback + f.optSize)
 }
