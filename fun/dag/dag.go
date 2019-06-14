@@ -9,7 +9,7 @@ import "math/big"
 /*
 Fun is the method for encoding/decoding special type of Directed Asynchronous
 Graph into a binary string with an array of input nodes  and an array of ordered
-interior nodes.
+interior nodes. CODE  UNDER DEVELOPMENT!
 
 Node Linking
 
