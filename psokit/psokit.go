@@ -34,7 +34,7 @@ sequence. the supported interfaces are:
 		ActInit // pre runs Action
 		ActRunInit // pre run Action
 		ActUpdate  // post iteration Action
-		ActData  // data interface Action ocurring every Nthink() iterations
+		ActData  // data interface Action occurring every Nthink() iterations
 		ActResult // post run Action
 		ActSummary // post runs Action
 */
@@ -217,8 +217,18 @@ func (man *ManPso) String() string {
 //FunCase returns the cost-function case name.
 func (man *ManPso) FunCase() string { return man.funCase }
 
+//SetFunCase sets the cost-function case name.
+func (man *ManPso) SetFunCase(name string) {
+	man.funCase = name
+}
+
 //PsoCase returns the SPSO case name.
 func (man *ManPso) PsoCase() string { return man.psoCase }
+
+//SetPsoCase sets the SPSo case name.
+func (man *ManPso) SetPsoCase(name string) {
+	man.psoCase = name
+}
 
 //Iter returns the iteration count during a run.
 func (man *ManPso) Iter() int { return man.iter }

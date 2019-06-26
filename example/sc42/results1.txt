@@ -1,0 +1,130 @@
+ManPso Settings:
+cost-function = sumcubesfor42-1	SPSO = clpso-0
+Number of Runs = 10 	Number of Particles = 61
+Max number of data coms in a run = 1200
+Thinking interval between data coms = 1200
+funSeed=3142 + runid*0	psoSeed=578 + runid*34
+
+sum of 3 cubes equal to 42 parameters:
+bitwidth for each cubes encoding: 60
+
+RUN 0:
+Cost: 126
+ x0: -7
+x1: 8
+x2: -1
+ans/42: 4
+ans mod 42: 0
+part0: 0 
+part1: 1 
+part2: 0 
+flags 10100 
+
+RUN 1:
+Cost: 126
+ x0: -7
+x1: 8
+x2: -1
+ans/42: 4
+ans mod 42: 0
+part0: 0 
+part1: 1 
+part2: 0 
+flags 10000 
+
+RUN 2:
+Cost: 126
+ x0: -7
+x1: 8
+x2: -1
+ans/42: 4
+ans mod 42: 0
+part0: 0 
+part1: 1 
+part2: 0 
+flags 10000 
+
+RUN 3:
+Cost: 126
+ x0: -7
+x1: 8
+x2: -1
+ans/42: 4
+ans mod 42: 0
+part0: 0 
+part1: 1 
+part2: 0 
+flags 10100 
+
+RUN 4:
+Cost: 126
+ x0: -7
+x1: 8
+x2: -1
+ans/42: 4
+ans mod 42: 0
+part0: 0 
+part1: 1 
+part2: 0 
+flags 10000 
+
+RUN 5:
+Cost: 126
+ x0: -7
+x1: 8
+x2: -1
+ans/42: 4
+ans mod 42: 0
+part0: 0 
+part1: 1 
+part2: 0 
+flags 10100 
+
+RUN 6:
+Cost: 126
+ x0: -7
+x1: 8
+x2: -1
+ans/42: 4
+ans mod 42: 0
+part0: 0 
+part1: 1 
+part2: 0 
+flags 10100 
+
+RUN 7:
+Cost: 126
+ x0: -7
+x1: 8
+x2: -1
+ans/42: 4
+ans mod 42: 0
+part0: 0 
+part1: 1 
+part2: 0 
+flags 10100 
+
+RUN 8:
+Cost: 126
+ x0: -7
+x1: 8
+x2: -1
+ans/42: 4
+ans mod 42: 0
+part0: 0 
+part1: 1 
+part2: 0 
+flags 10000 
+
+RUN 9:
+Cost: 126
+ x0: -7
+x1: 8
+x2: -1
+ans/42: 4
+ans mod 42: 0
+part0: 0 
+part1: 1 
+part2: 0 
+flags 10000 
+

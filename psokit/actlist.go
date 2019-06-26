@@ -95,6 +95,7 @@ type Presult struct{}
 func (a *Presult) Result(man *ManPso) {
 	p := man.P()
 	f := man.F()
+	fmt.Printf("RUN %d:\n", man.RunID())
 	fmt.Printf("Cost: %v\n %s\n", p.GlobalCost(), f.Decode(p.GlobalParams()))
 }
 
