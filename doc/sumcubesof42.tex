@@ -141,24 +141,34 @@ Finally to satisfy the $\mod 7$ constraints in \ref{m7-x1} and  \ref{m7-x2} we s
 \end{align} 
 Let the substitutions be 
 \begin{align}
-k_1 \leftarrow & k_1+d_1\\
-k_2 \leftarrow & k_2+d_2
+j_1 \leftarrow & j_1+d_1\\
+j_2 \leftarrow & j_2+d_2
 \end{align}
-then by inspection of the $\mod 7$ table we can satisfy the constraints  \ref{m7-x1} and \ref{m7-x2} using table \ref{d-values}
-\begin{table}[h] 	\caption{\label{d-values} $d_1, d_2$ Values to satisfy \ref{m7-x1} and \ref{m7-x2}  }
+where $d_1$ and $d_2$ are chosen to be positive or zero to avoid generating negative $j_i$.
+then by inspection of the $\mod 7$ table we can satisfy the constraints  \ref{m7-x1} and \ref{m7-x2} using tables \ref{d-values1} and \ref{d-values2}
+\begin{table}[h] 	\caption{\label{d-values1} $d_1$ Values to satisfy \ref{m7-x1}  }
 	\begin{center}
 		\begin{tabular}{|c||ccccccc|}
 			\hline
-			$x_1 \mod 7$&0 &1 &2 &3 &4 &5 &6 \\
-			$d_1$       &-1&0 &0 &1 &0 &1 &2\\
-			\hline	\hline
-			$x_2 \mod 7$&0 &1 &2 &3 &4 &5 &6 \\
-			$d_2$       & 1&-2&-1& 0&-1&0 &0\\
+			$x_1 \mod 7$ &0 &1 &2 &3 &4 &5 &6 \\
+			$d_1$,$f_1=0$&3 &0 &0 &1 &0 &1 &2\\
+			$d_1$,$f_1=1$&1 &0 &0 &1 &0 &3 &2\\
 			\hline
 		\end{tabular}
 	\end{center}
 \end{table} 
 
+\begin{table}[h] 	\caption{\label{d-values2} $d_2$ Values to satisfy \ref{m7-x2}  }
+	\begin{center}
+		\begin{tabular}{|c||ccccccc|}
+			\hline
+			$x_2 \mod 7$ &0 &1 &2 &3 &4 &5 &6 \\
+			$d_2$,$f_2=0$&1 &2 &3 &0 &1 &0 &0\\
+			$d_2$,$f_2=1$&3 &2 &1 &0 &1 &0 &0\\
+			\hline
+		\end{tabular}
+	\end{center}
+\end{table} 
 
 
 \bibliographystyle{alpha}
