@@ -6,6 +6,8 @@ package simplefactor
 import (
 	"fmt"
 	"math/big"
+
+	"github.com/mathrgo/setpso"
 )
 
 // Fun type stores data for tests of a factor of the product pq
@@ -42,6 +44,24 @@ func New(p, q *big.Int) *Fun {
 	f.pq.Mul(p, q)
 	f.Nbit = p.BitLen()
 	return &f
+}
+
+/*Creator is used by psokit to create instances of Fun through its interface
+method Create().
+*/
+type Creator struct {
+	p, q *big.Int
+}
+
+// NewCreator just returns a Creator of Fun with primes p,q.
+func NewCreator(p, q *big.Int) *Creator {
+	c := Creator{p, q}
+	return &c
+}
+
+// Create creates an instance
+func (c *Creator) Create(sd int64) setpso.Fun {
+	return New(c.p, c.q)
 }
 
 // ToConstraint uses the previous parameter pre and the updating hint parameter

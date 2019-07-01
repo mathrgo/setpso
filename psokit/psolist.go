@@ -32,7 +32,7 @@ sets up man to use it . This also assumes the cost-function has been created for
 man beforehand using CreateFun().
 */
 func (man *ManPso) CreatePso(name string) (p PsoInterface) {
-	p0 := setpso.NewPso(man.npart, man.f, int64(578+34*man.runid))
+	p0 := setpso.NewPso(man.npart, man.f, man.psoSeed0+man.psoSeed1*int64(man.runid))
 	switch name {
 	case "gpso-0":
 		p = setpso.NewGPso(p0)
