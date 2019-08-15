@@ -30,7 +30,7 @@ func ExampleSplitter_Join() {
 	parts := make([]*big.Int, 3)
 	parts[0] = big.NewInt(5)
 	parts[1] = big.NewInt(10)
-	parts[2] = big.NewInt(256)
+	parts[2] = big.NewInt(255)
 	x := big.NewInt(2)
 	sp := NewSplitter(4, 4, 8)
 	err := sp.Join(parts, x)
