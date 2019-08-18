@@ -39,8 +39,8 @@ func main() {
 	man.SetNthink(60)
 	man.SetNpart(61)
 	man.SetPsoCase("clpso-0")
-	man.SetFunCase("parity-4-1")
-	if err := man.AddFun("parity-4-1", "attempts to find 4bool DAG for parity of 4 inputs ", &fc); err != nil {
+	man.SetFunCase("parity-5-1")
+	if err := man.AddFun("parity-5-1", "attempts to find 4bool DAG for parity of 5 inputs ", &fc); err != nil {
 		fmt.Println(err)
 	}
 	if err := man.SelectActs(
