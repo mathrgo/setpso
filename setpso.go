@@ -6,6 +6,8 @@ import (
 	"math"
 	"math/big"
 	"math/rand"
+
+	"github.com/mathrgo/setpso/fun/futil"
 )
 
 /*
@@ -47,7 +49,7 @@ and a call to  Delete() returns false.
 */
 type Fun interface {
 	// evaluated cost where a lower cost is better
-	Cost(x *big.Int) *big.Int
+	Cost(x *big.Int) futil.CostValue
 	// maximum number of bits in the parameter big integer which is the
 	// maximum number of elements in the subset
 	MaxLen() (maxlen int)
@@ -62,6 +64,8 @@ type Fun interface {
 	Decode(z *big.Int) (s string)
 	// this hints to the function to remove/replace the ith item
 	Delete(i int) bool
+	//creates zero cost value
+	NewCostValue() futil.CostValue
 }
 
 /*
@@ -76,13 +80,13 @@ type PsoInterface interface {
 	// best global Parameters so far
 	GlobalParams() *big.Int
 	// the cost of the global best
-	GlobalCost() *big.Int
+	GlobalCost() futil.CostValue
 	// number of particles
 	Nparticles() int
 	// current parameters of the ith Particle
 	Params(i int) *big.Int
 	// Local-best cost of the ith Particle
-	LocalBestCost(i int) *big.Int
+	LocalBestCost(i int) futil.CostValue
 	// Local-best Parameters of the ith Particle
 	LocalBestParameters(i int) *big.Int
 	// interface for requesting debug output based on cmd
@@ -101,13 +105,13 @@ type Particle struct {
 	// state
 	hint *big.Int
 	// current computed cost
-	cost *big.Int
+	cost futil.CostValue
 	// pointer to group the particle belongs to
 	group *Group
 	// best parameter values so far
 	bestParams *big.Int
 	//  best personal cost so far corresponding to this parameter
-	best *big.Int
+	best futil.CostValue
 	// current  flipping probability requests for each bit component
 	vel []float64
 }
@@ -121,7 +125,7 @@ type Group struct {
 	// list of update targets by index (normally of length <= 2)
 	targets []int
 	// this gives the cost of the best member
-	bestCost *big.Int
+	bestCost futil.CostValue
 	// this gives the index for the  best member in Pt
 	bestMember int
 	// heuristics for the group
@@ -143,7 +147,7 @@ type Pso struct {
 	//scratch pad for intermediate velocity calculation
 	tempVel []float64
 	// this gives the cost of the global best
-	bestCost *big.Int
+	bestCost futil.CostValue
 	// this gives the parameters for the global best
 	bestParams *big.Int
 	// cost function
@@ -202,9 +206,9 @@ func NewPso(n int, fun Fun,
 
 	g.targets = make([]int, 1, 2)
 
-	g.bestCost = big.NewInt(0)
+	g.bestCost = pso.fun.NewCostValue()
 
-	pso.bestCost = big.NewInt(0)
+	pso.bestCost = pso.fun.NewCostValue()
 	pso.bestParams = big.NewInt(0)
 	pso.Pt = make([]Particle, n)
 	maxN := big.NewInt(0)
@@ -222,10 +226,10 @@ func NewPso(n int, fun Fun,
 			searching = !pso.fun.ToConstraint(p.params, p.hint)
 		}
 		p.params.Set(p.hint)
-		p.cost = big.NewInt(0)
+		p.cost = pso.fun.NewCostValue()
 		g.members[i] = i
 		p.cost.Set((pso.fun).Cost(p.params))
-		p.best = big.NewInt(0)
+		p.best = pso.fun.NewCostValue()
 		p.best.Set(p.cost)
 		p.bestParams = big.NewInt(0)
 		p.bestParams.Set(p.params)
@@ -243,9 +247,13 @@ Note that it looks for the best in the current iteration and disregards historic
 best costs even if they were better.
 */
 func (pso *Pso) UpdateGroup(g *Group) {
-	g.bestCost.Set(pso.maxN)
-	g.bestMember = -1
-	for i := range g.members {
+	if len(g.members) == 0 {
+		g.bestMember = -1
+		return
+	}
+	g.bestMember = g.members[0]
+	g.bestCost.Set(pso.Pt[g.bestMember].best)
+	for i := range g.members[1:] {
 		id := g.members[i]
 		p := &pso.Pt[id]
 		if p.best.Cmp(g.bestCost) < 0 {
@@ -260,16 +268,22 @@ and then finding the best group with its best particle.
  It searches for minimum best cost particle.
 */
 func (pso *Pso) UpdateGlobal() {
-	pso.bestCost.Set(pso.maxN)
 	for _, g := range pso.gr {
 		pso.UpdateGroup(g)
 	}
 	pso.bestGroup = nil
-	// assume pso.gr is not empty
+
 	for _, g := range pso.gr {
-		if g.bestCost.Cmp(pso.bestCost) < 0 {
-			pso.bestCost.Set(g.bestCost)
-			pso.bestGroup = g
+		if len(g.members) > 0 {
+			if pso.bestGroup != nil {
+				if g.bestCost.Cmp(pso.bestCost) < 0 {
+					pso.bestCost.Set(g.bestCost)
+					pso.bestGroup = g
+				}
+			} else {
+				pso.bestCost.Set(g.bestCost)
+				pso.bestGroup = g
+			}
 		}
 	}
 	//copy across the best case
@@ -277,7 +291,7 @@ func (pso *Pso) UpdateGlobal() {
 }
 
 // GlobalCost returns the current global best cost.
-func (pso *Pso) GlobalCost() *big.Int {
+func (pso *Pso) GlobalCost() futil.CostValue {
 	return pso.bestCost
 }
 
@@ -292,7 +306,7 @@ func (pso *Pso) Params(i int) *big.Int {
 }
 
 //LocalBestCost returns the current local best cost  for the ith particle.
-func (pso *Pso) LocalBestCost(i int) *big.Int {
+func (pso *Pso) LocalBestCost(i int) futil.CostValue {
 	return pso.Pt[i].best
 }
 
@@ -503,7 +517,7 @@ func (pso *Pso) CreateGroup(name string, ntargets int) *Group {
 	g.targets = make([]int, ntargets)
 	pso.gr[name] = g
 	g.id = name
-	g.bestCost = big.NewInt(0) // this will be over written before use
+	g.bestCost = pso.fun.NewCostValue() // this will be over written before use
 	return g
 }
 
@@ -649,8 +663,8 @@ type CLPso struct {
 type CLpart struct {
 	// probability of learning from other particles
 	pc float64
-	// last best while pursuing the current target
-	lastBest *big.Int
+	// last best cost while pursuing the current target
+	lastBest futil.CostValue
 	// failure to improve count while pursuing current target
 	gapCount int
 }
@@ -682,7 +696,7 @@ func NewCLPso(p *Pso) *CLPso {
 	for i := range pso.clPt {
 		c := &pso.clPt[i]
 		c.pc = Pc0(i, n)
-		c.lastBest = big.NewInt(0)
+		c.lastBest = pso.fun.NewCostValue()
 		c.gapCount = -1 // play safe
 		gp := pso.CreateGroup(string(i), 1)
 		pso.MoveTo(gp, i)
@@ -702,25 +716,25 @@ target it randomly selects two Particles and chooses the one  that gives the
 least of the Local-best Cost. Note the choice is from all particles and can
 include itself. After this it does the usual PUpdate().
 */
-func (pso *CLPso) Update() {
-	for i := range pso.clPt {
-		c := &pso.clPt[i]
-		g := pso.Group(i)
-		if c.gapCount > pso.TryGap {
+func (p *CLPso) Update() {
+	for i := range p.clPt {
+		c := &p.clPt[i]
+		g := p.Group(i)
+		if c.gapCount > p.TryGap {
 			c.gapCount = 0
-			if pso.rnd.Float64() < c.pc {
-				i1 := pso.rnd.Intn(pso.Nparticles())
-				i2 := pso.rnd.Intn(pso.Nparticles())
-				if (pso.LocalBestCost(i1)).Cmp(pso.LocalBestCost(i2)) < 0 {
-					pso.SetGroupTarget(g, i1)
+			if p.rnd.Float64() < c.pc {
+				i1 := p.rnd.Intn(p.Nparticles())
+				i2 := p.rnd.Intn(p.Nparticles())
+				if (p.LocalBestCost(i1)).Cmp(p.LocalBestCost(i2)) < 0 {
+					p.SetGroupTarget(g, i1)
 				} else {
-					pso.SetGroupTarget(g, i2)
+					p.SetGroupTarget(g, i2)
 				}
 			} else {
-				pso.SetGroupTarget(g, i)
+				p.SetGroupTarget(g, i)
 			}
 		} else {
-			cost := pso.Pt[i].cost
+			cost := p.Pt[i].cost
 			if c.gapCount < 0 {
 				c.lastBest.Set(cost)
 				c.gapCount++
@@ -732,7 +746,7 @@ func (pso *CLPso) Update() {
 			}
 		}
 	}
-	pso.PUpdate()
+	p.PUpdate()
 }
 
 /*PrintDebug outputs debugging diagnostics depending on the command id.

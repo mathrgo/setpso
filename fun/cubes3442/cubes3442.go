@@ -11,7 +11,7 @@ import (
 	"github.com/mathrgo/setpso/fun/futil"
 )
 
-//Fun is the data structure used by
+//Fun is the data structure used
 type Fun struct {
 	bitLen                      int
 	x0, x1, x2                  *big.Int
@@ -20,6 +20,13 @@ type Fun struct {
 	zero, one, two, three, four *big.Int
 	six, seven                  *big.Int
 	fortyTwo                    *big.Int
+	cost                        futil.CostValue
+}
+
+//NewCostValue creates a zero cost value representing a
+// big integer.
+func (f *Fun) NewCostValue() futil.CostValue {
+	return futil.NewIntCostValue()
 }
 
 /*New creates an instance of the function that uses bitLen bits for the positive
@@ -40,6 +47,7 @@ func New(bitLen int) *Fun {
 	f.six = big.NewInt(6)
 	f.seven = big.NewInt(7)
 	f.fortyTwo = big.NewInt(42)
+	f.cost = f.NewCostValue()
 	f.parts = make([]*big.Int, 4)
 	for i := range f.parts {
 		f.parts[i] = big.NewInt(0)
@@ -117,12 +125,12 @@ func (f *Fun) evalX12(c3index int) {
 Cost returns the absolute value of the difference between decoded
 sum of cubes and 42. It assumes x already meets constraints.
 */
-func (f *Fun) Cost(x *big.Int) *big.Int {
+func (f *Fun) Cost(x *big.Int) futil.CostValue {
 	f.evalXs(x)
-	cost := f.ans()
+	cost1 := f.ans()
 	// calculate error
-	cost.Abs(cost.Sub(cost, f.fortyTwo))
-	return cost
+	f.cost.Set(cost1.Abs(cost1.Sub(cost1, f.fortyTwo)))
+	return f.cost
 }
 
 // MaxLen returns the maximum number of bits to use for parameter x

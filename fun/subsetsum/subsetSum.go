@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+
+	"github.com/mathrgo/setpso/fun/futil"
 )
 
 // Fun is the subset sum problem cost function
@@ -27,6 +29,14 @@ type Fun struct {
 	NBit int
 	//Seed used for generating the subset sum problems
 	Seed int64
+	//Store of CostValue
+	cost futil.CostValue
+}
+
+//NewCostValue creates a zero cost value representing a
+// big integer.
+func (f *Fun) NewCostValue() futil.CostValue {
+	return futil.NewIntCostValue()
 }
 
 // New generates a subset sum problem using n Element set elements and
@@ -57,19 +67,21 @@ func New(nElement int, nBit int, sd int64) *Fun {
 			f.Target.Add(f.Target, f.ElementValues[j])
 		}
 	}
+	f.cost = f.NewCostValue()
 	return &f
 }
 
 // Cost returns the absolute value of the difference between the subset sum
 // and the target value for the sum for the subset x
-func (f *Fun) Cost(x *big.Int) *big.Int {
+func (f *Fun) Cost(x *big.Int) futil.CostValue {
 	f.sum.SetInt64(0)
 	for i := range f.ElementValues {
 		if x.Bit(i) == 1 {
 			f.sum.Add(f.sum, f.ElementValues[i])
 		}
 	}
-	return f.sum.Abs(f.sum.Sub(f.sum, f.Target))
+	f.cost.Set(f.sum.Abs(f.sum.Sub(f.sum, f.Target)))
+	return f.cost
 }
 
 // MaxLen returns the number of elements in the subset sum problem

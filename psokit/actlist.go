@@ -20,9 +20,9 @@ func (man *ManPso) SelectActs(ac ...string) error {
 		var a Act
 		switch name {
 		case "print-result":
-			a = new(Presult)
+			a = new(Printresult)
 		case "print-headings":
-			a = new(Pheading)
+			a = new(Printheading)
 		case "plot-personal-best":
 			a = new(PlotPersonalBest)
 		case "use-cmd-options":
@@ -60,8 +60,8 @@ actions
 func (man *ManPso) loadActDescription() {
 	man.actd = map[string]string{
 
-		"print-result":       "Print final result at end of run; using Presult ",
-		"print-headings":     "Prints setup and run headings; using Pheading",
+		"print-result":       "Print final result at end of run; using Printresult ",
+		"print-headings":     "Prints setup and run headings; using Printheading",
 		"plot-personal-best": "Plots the personal best during a run; using PlotPersonalBest",
 		"use-cmd-options":    "Use command options to change configuration; using CmdOptions"}
 }
@@ -86,13 +86,13 @@ func (man *ManPso) ActDescription() string {
 }
 
 /*
-Presult  used as the
+Printresult  used as the
 Action, print-result
 */
-type Presult struct{}
+type Printresult struct{}
 
 //Result just prints  the run result as cost and decoded subset
-func (a *Presult) Result(man *ManPso) {
+func (a *Printresult) Result(man *ManPso) {
 	p := man.P()
 	f := man.F()
 	fmt.Printf("RUN %d:\n", man.RunID())
@@ -100,12 +100,12 @@ func (a *Presult) Result(man *ManPso) {
 }
 
 /*
-Pheading used as the Action, print-headings
+Printheading used as the Action, print-headings
 */
-type Pheading struct{}
+type Printheading struct{}
 
 //Init prints man settings
-func (a *Pheading) Init(man *ManPso) {
+func (a *Printheading) Init(man *ManPso) {
 	fmt.Println(man)
 }
 
@@ -113,7 +113,7 @@ func (a *Pheading) Init(man *ManPso) {
 RunInit outputs information about the cost-function. If the seed does not
 vary between runs it only outputs on the first run
 */
-func (a *Pheading) RunInit(man *ManPso) {
+func (a *Printheading) RunInit(man *ManPso) {
 	_, sd1 := man.FunSeed()
 	if man.RunID() == 0 || sd1 != 0 {
 		fmt.Println(man.F().About())
@@ -123,18 +123,18 @@ func (a *Pheading) RunInit(man *ManPso) {
 // ResultsArray is a structure for storing and plotting results from Each
 // particle
 type ResultsArray struct {
-	pnts []plotter.XYs
+	points []plotter.XYs
 }
 
 /*
 NewResultsArray creates a Results Array and returns a pointer to it.
-It consists of ndata data entries for nval values per entry.
+It consists of datalength data entries for dimension values per entry.
 */
-func NewResultsArray(ndata, nval int) *ResultsArray {
+func NewResultsArray(datalength, dimension int) *ResultsArray {
 	var r ResultsArray
-	r.pnts = make([]plotter.XYs, nval)
-	for i := 0; i < nval; i++ {
-		r.pnts[i] = make(plotter.XYs, ndata)
+	r.points = make([]plotter.XYs, dimension)
+	for i := 0; i < dimension; i++ {
+		r.points[i] = make(plotter.XYs, datalength)
 	}
 	return &r
 }
@@ -144,16 +144,16 @@ ResUpdate puts val into the plotting results array for value index valueID and
 data slot dataID where valID is the number of iterations so far in a run.
 */
 func (r *ResultsArray) ResUpdate(val float64, dataID, valID, iterID int) {
-	r1 := r.pnts[valID]
+	r1 := r.points[valID]
 	r1[dataID].X = float64(iterID)
 	r1[dataID].Y = val
 }
 
 /*
-NewPlot creates a basic plot. yname is the Y-axis label; title is the plot title;
+NewPlot creates a basic plot. yaxisname is the Y-axis label; title is the plot title;
 runid is the run ID.
 */
-func (r *ResultsArray) NewPlot(yname, title string, runid int) {
+func (r *ResultsArray) NewPlot(yaxisname, title string, runid int) {
 	// Create a new plot
 	pl1, err1 := plot.New()
 	if err1 != nil {
@@ -162,8 +162,8 @@ func (r *ResultsArray) NewPlot(yname, title string, runid int) {
 	// Draw a grid behind the data
 	pl1.Add(plotter.NewGrid())
 	// for each particle Make a line plotter with points and set its style.
-	for i := range r.pnts {
-		pl1Line, _, err := plotter.NewLinePoints(r.pnts[i])
+	for i := range r.points {
+		pl1Line, _, err := plotter.NewLinePoints(r.points[i])
 		if err != nil {
 			panic(err)
 		}
@@ -171,9 +171,9 @@ func (r *ResultsArray) NewPlot(yname, title string, runid int) {
 	}
 	pl1.Title.Text = fmt.Sprintf("%s of particle: Run %d", title, runid)
 	pl1.X.Label.Text = "iteration"
-	pl1.Y.Label.Text = yname
+	pl1.Y.Label.Text = yaxisname
 	// Save the plot to a PNG file.
-	filename := fmt.Sprintf("plot%s%d.pdf", yname, runid)
+	filename := fmt.Sprintf("plot%s%d.pdf", yaxisname, runid)
 	if errx1 := pl1.Save(4*vg.Inch, 4*vg.Inch, filename); errx1 != nil {
 		panic(errx1)
 	}
@@ -188,14 +188,14 @@ type PlotPersonalBest struct {
 
 //RunInit setup plotting arrays for the run
 func (pl *PlotPersonalBest) RunInit(man *ManPso) {
-	*pl = PlotPersonalBest{NewResultsArray(man.Ndata(), man.Npart())}
+	*pl = PlotPersonalBest{NewResultsArray(man.Datalength(), man.Npart())}
 }
 
 //DataUpdate loads personal best costs into plot
 func (pl *PlotPersonalBest) DataUpdate(man *ManPso) {
 	p := man.P()
 	for j := 0; j < man.Npart(); j++ {
-		pl.ResUpdate(Fbits(p.LocalBestCost(j)), man.Diter(), j, man.Iter())
+		pl.ResUpdate(p.LocalBestCost(j).Fbits(), man.Diter(), j, man.Iter())
 	}
 }
 

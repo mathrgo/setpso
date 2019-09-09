@@ -80,7 +80,7 @@ it is done here to give easy comparison with the above list
 func (man *ManPso) loadFunDescription() {
 
 	man.fund = map[string]string{
-		"subsetsum-0":     "basic subset sum case 100 elements with upto 20 bit int",
+		"subsetsum-0":     "basic subset sum case 100 elements with up to 20 bit int",
 		"simplefactor-30": "30 bit prime factorisation",
 		"simplefactor-25": "25 bit prime factorisation",
 		"simplefactor-16": "16 bit prime factorisation"}

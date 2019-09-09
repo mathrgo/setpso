@@ -8,6 +8,7 @@ import (
 	"math/big"
 
 	"github.com/mathrgo/setpso"
+	"github.com/mathrgo/setpso/fun/futil"
 )
 
 // Fun type stores data for tests of a factor of the product pq
@@ -18,6 +19,13 @@ type Fun struct {
 	pq   *big.Int
 	p    *big.Int
 	q    *big.Int
+	cost futil.CostValue
+}
+
+//NewCostValue creates a zero cost value representing a
+// big integer.
+func (f *Fun) NewCostValue() futil.CostValue {
+	return futil.NewIntCostValue()
 }
 
 // MaxLen returns the number of elements in the subset sum problem
@@ -25,11 +33,12 @@ func (f *Fun) MaxLen() int {
 	return f.Nbit
 }
 
-//Cost returns the remainder after dividing p int the prime product
-func (f *Fun) Cost(p *big.Int) *big.Int {
+//Cost returns the remainder after dividing p in to the prime product
+func (f *Fun) Cost(p *big.Int) futil.CostValue {
 	var c, q big.Int
 	q.DivMod(f.pq, p, &c)
-	return &c
+	f.cost.Set(&c)
+	return f.cost
 }
 
 // New creates a new function where p and q are the two prime components
@@ -43,6 +52,7 @@ func New(p, q *big.Int) *Fun {
 	f.q.Set(q)
 	f.pq.Mul(p, q)
 	f.Nbit = p.BitLen()
+	f.cost = f.NewCostValue()
 	return &f
 }
 

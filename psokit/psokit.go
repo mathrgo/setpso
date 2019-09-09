@@ -117,9 +117,9 @@ type ManPso struct {
 	//data count
 	diter int
 	// maximum number of data outputs per run
-	ndata int
+	datalength int
 	// thinking iteration between data output
-	titer int
+	thinkiteration int
 	// number of thinking iterations between data output
 	nthink int
 
@@ -167,7 +167,7 @@ func NewMan() *ManPso {
 	man.loadActDescription()
 	man.stopAt = 3
 	man.dbug = false
-	man.ndata = 1200
+	man.datalength = 1200
 	man.nthink = 300
 	man.nrun = 1
 	man.npart = 10
@@ -207,7 +207,7 @@ func (man *ManPso) String() string {
 	}
 	s += fmt.Sprintf("Number of Runs = %d \t", man.nrun)
 	s += fmt.Sprintf("Number of Particles = %d\n", man.npart)
-	s += fmt.Sprintf("Max number of data coms in a run = %d\n", man.ndata)
+	s += fmt.Sprintf("Max number of data coms in a run = %d\n", man.datalength)
 	s += fmt.Sprintf("Thinking interval between data coms = %d\n", man.nthink)
 	s += fmt.Sprintf("funSeed=%d + runid*%d\t", man.funSeed0, man.funSeed1)
 	s += fmt.Sprintf("psoSeed=%d + runid*%d\n", man.psoSeed0, man.psoSeed1)
@@ -236,11 +236,11 @@ func (man *ManPso) Iter() int { return man.iter }
 //Diter returns the data output count during a run.
 func (man *ManPso) Diter() int { return man.diter }
 
-//SetNdata sets Ndata.
-func (man *ManPso) SetNdata(n int) { man.ndata = n }
+//Setdatalength sets datalength.
+func (man *ManPso) Setdatalength(n int) { man.datalength = n }
 
-//Ndata is the maximum number of data events per run used mainly for plotting.
-func (man *ManPso) Ndata() int { return man.ndata }
+//Datalength is the maximum number of data events per run used mainly for plotting.
+func (man *ManPso) Datalength() int { return man.datalength }
 
 //Nthink is the number of thinking iterations between data output.
 func (man *ManPso) Nthink() int { return man.nthink }
@@ -322,8 +322,8 @@ func (man *ManPso) Run() {
 		for i := range man.actRunInit {
 			man.actRunInit[i].RunInit(man)
 		}
-		for man.diter = 0; man.diter < man.ndata; man.diter++ {
-			for man.titer = 0; man.titer < man.nthink; man.titer++ {
+		for man.diter = 0; man.diter < man.datalength; man.diter++ {
+			for man.thinkiteration = 0; man.thinkiteration < man.nthink; man.thinkiteration++ {
 				man.p.Update()
 				for i := range man.actUpdate {
 					man.actUpdate[i].Update(man)
@@ -423,30 +423,10 @@ func (man *ManPso) AddAct(name, desc string, a CreateAct) error {
 }
 
 /*
-Fbits gives a floating point measure of number of bits  in x that takes on non
-integer values to help represent big integer size for plotting. it approximates
-to the log of the big integer.
-*/
-func Fbits(x *big.Int) float64 {
-	n := x.BitLen()
-	if n <= 0 {
-		return float64(0)
-	}
-	n--
-	var a big.Int
-	a.SetBit(&a, n, 1)
-	var r big.Rat
-	r.SetFrac(x, &a)
-	f, _ := r.Float64()
-	return f + float64(n)
-
-}
-
-/*
-Fdif gives a measure of the difference of the integers x,y as sets and returns
+FloatingpointDifference gives a measure of the difference of the integers x,y as sets and returns
 the result as a floating point value of the Hamming distance between x and y.
 */
-func Fdif(x, y *big.Int) float64 {
+func FloatingpointDifference(x, y *big.Int) float64 {
 	var z big.Int
 	z.Xor(x, y)
 	return float64(setpso.CardinalSize(&z))
