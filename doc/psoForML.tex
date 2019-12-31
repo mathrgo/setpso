@@ -33,20 +33,58 @@ x_t^i&\mathrm{otherwise}
 \end{align} 
 where $F(x)$ is the cost of the state $x$; $N_t^i$ is the  collection of personal best states used by the $i$th particle to update its velocity from iteration $t$ to $t+1$: $\varOmega$ is a feasible  subset of states usually characterised as satisfying a collection of constraints . 
 
-The PSO has several variants and the above description is a general summery where for continuous parameters the state is a $d$ dimensional vector space of real numbers $\mathbb{R}^d$. Typically the velocity is made up from random multiples of the vector diference between $x_t^i$ personal bests and members of$N_t^i$ giving the swarms directions to go to look for improved $F(x)$ values. Also $\mu$ and $\xi$ are not true functions since they depend on hidden random variables that are crucial for ensuring the ability to find a low cost near optimal personal best after sufficient iteration, but are otherwise processes that depend on the variables given as their arguments. 
+The PSO has several variants and the above description is a general summery where for continuous parameters the state is a $d$ dimensional vector space of real numbers $\mathbb{R}^d$. Typically the velocity is made up from random multiples of the vector diference between $x_t^i$ personal bests and members of$N_t^i$ giving the swarms directions to go to look for improved $F(x)$ values. Also $\mu$ and $\xi$ are not true functions since they depend on hidden random variables that are crucial for ensuring the ability to find a low cost near optimal personal best after sufficient iteration, but are otherwise processes that depend on the variables given as their arguments.
+ 
+\subsection{The direction of Interest}
+The main interest is developing an optimiser for Machine Learning that bridges the gap between neural nets and more structure determining optimisers such as genetic algorithms. To do this the current work looks at combinatorial optimisation problems (COP) using discrete tuning parameters in the form of binary strings (BS) for particle state with a range of cost-function value types. Such  a PSO will be called a Set PSO ( abbreviated to SPSO) to emphasise that it interprets BS as  sub sets to represent the parameters of SPSO. 
 
-The current work looks at combinatorial optimisation problems (COP) using discrete tuning parameters in the form of binary strings (BS) for particle state with big integer cost functions. Such  a PSO will be called a Set PSO ( abbreviated to SPSO) to emphasise that it interprets BS as  sub sets to represent the parameters of SPSO. 
+\subsection{Machine Learning Extensions }
+For  Machine Learning there is a need to extend the basic SPSO to cope with:
+\begin{enumerate}
+	\item noisy data mainly due to a restricted amount of available data when evaluating a cost-function. 
+	\item represent continuous state such as design or neural net parameters by a set of discrete values some what similar to the way genetic algorithms deal with this by digitizing the continuous case.
+	\item treat random strings of bits as a way of generating useful programs  to find optimising solutions which in turn can be used as a way of tuning meta parameters.
+	\item Acknowledge that only approximate solutions are  needed to avoid over fitting. 
+\end{enumerate}  
+\subsection{Implementation and Development}
+The SPSO is developed mainly through biased intuitive analogy with  other systems. As such it needs a programming language to explore empirically its properties and implement it. The language chosen is Golang. The treatment of SPSO here attempts to make the description language agnostic, however sometimes golang constructs such as interface are directly used to simplify the description of algorithms and help the user understand what the code is trying to do.     
 
 \section{Set PSO}
-\subsection{Using Big Integers for Cost-function }   
-The restriction to big integer is strictly not required since the cost function is used only to compare the cost between solutions so at a later stage one  may extend to floating point or rational cost functions with extended resolution.However, Most COPs are manageable if the number of possible values is kept reasonably small by restricting the range of integers.Big integers are used to include some of the difficult cases although the chance of finding global best solutions to these problems is minimal. The algorithms are expected to however produce good useful approximations to these hard problems. for the moment we adopt the principle that real number cost functions can be converted into an approximate big integer by multiplying by a suitable large constant  to achieve the desired resolution after rounding to the nearest integer. I would like to suggest that main area of application is \emph{machine learning where one is interested in good approximate minimisation solutions of difficult problems}.
+\subsection{Cost-function Value Representation}   
+COP problems are discrete in nature and often have an integer cost-function value, because of this big integer cost values was initially used for SPSO.  The restriction to big integer is strictly not required since the cost function is used only to compare the cost between solutions so the cost function value in the software is represented by the interface type \texttt{CostValue}. This has the additional advantage that it can contain state to help deal with noisy data that needs to be evaluated several times to reduce the noise and store its variance.
+
+Formaly \texttt{CostValue} object \texttt{cost} has the following interface methods were \texttt{x} is to be kept general to avoid a circular definition, but is expected to  have a type that can be converted to the cost value object being used:
+\begin{list}{}
+	\item \texttt{cost.Set(x interface\{\})} this sets the oject to a copy of the value \texttt{x}. 
+	\item \texttt{cost.Cmp(x interface\{\}) int} this compares the cost value object with x and returns the following values:
+		\begin{list}{}
+		\item $-2$ \texttt{cost} needs to be further evaluated to establish a comparison.
+		\item $-1$ \texttt{cost} has a lower cost than \texttt{x}.
+		\item $\quad 0$ \texttt{cost} has the same cost value as \texttt{x}.
+		\item $\quad 1$ \texttt{cost} has a larger cost vale than \texttt{x}.
+		\item $\quad 2$ \texttt{x} needs to be further evaluated to establish a comparison.
+		\end{list}
+	
+	\item \texttt{cost.Fbits() float64} this returns a logarithmic like floating point value for plotting; it attempts to give the number of bits  used in the big integer case. In most cases the cost is always positive in which case a zero cost returns $0$.
+
+\end{list}
+As can be seen the underlying implementation of the cost value is well hidden from SPSO by using this interface it allows the cost-function to have a range of implementations  of its cost value which could include big integers, floating point, or even strings representing programs! 
+
+Here we talk about a cost value as if it has a numerical value; this may not be  the case it could for instance be a program to implement changes to reach a goal; in this case  \texttt{Fbits()} just gives an indication of the complexity of the changes while \texttt{Comp()} does the comparison between solutions. 
+
+\texttt{Comp()} has two additional values $\pm2$ which are used in cases where the cost value is difficult to compare without further evaluation due to randomness in the costs being evaluated. behind the scenes the cost value could for instance have a measured mean and variance associated to the cost value. If there is too much variance associated with a solution pair there cannot be a meaningful comparison between them and further cases are needed to reduce the variance through more cost-function evaluation.  
+
+Big integer cost values are used to include some of the difficult cases in combinatorial optimisation, although the chance of finding global best solutions to these problems is minimal; however, The algorithms are expected to produce good useful approximations to these hard problems; I would like to suggest that main area of application is \emph{machine learning where one is interested in good approximate minimisation solutions of difficult problems}.
 
 
 \subsection{The Importance of Satisfying Constraint on Solutions }
-COP problems such as the Travelling Sales Person(TSP) have constraints defining $\varOmega$ that must be satisfied if to be of any use so one must continuously ensure the candidate solution is in $\varOmega$ before evaluating its cost. Often feasible points $\varOmega$ do not form an open subset of the space of states so a raw update of $x_t^i$ will not give a feasible state most of the time. To cope with this $\xi$ computes a raw update $\breve{x}_{t+1}^i$ which it then attempts to  convert into a feasible one before being returned as a update. Sometimes this may not be possible and the returned $x_t^i$ is not in $\varOmega$. As indicated in the update equation this results in no change to the personal best thus ensuring that personal bests are updated to feasible states.   
+COP problems such as the Travelling Sales Person(TSP) have constraints defining $\varOmega$ that must be satisfied if to be of any use so one must continuously ensure the candidate solution is in $\varOmega$ before evaluating its cost. Often feasible points $\varOmega$ do not form an open subset of the space of states so a raw update of $x_t^i$ will not give a feasible state most of the time. To cope with this $\xi$ computes a raw update $\breve{x}_{t+1}^i$ which it then attempts to  convert into a feasible one before being returned as a update. Sometimes this may not be possible and the returned $x_t^i$ is not in $\varOmega$. As indicated in the update equation this results in no change to the personal best thus ensuring that personal bests are updated to only feasible states.   
 
 \subsection{Generalised Link Between COP and SPSO}
-The link between COP and SPSO is forged by using binary strings to represent candidate algorithms which are obtained by decoding the string. I use the term algorithm to represent any method for finding approximate solutions to a COP problem including just providing an approximate solution with no use of an algorithm. I think decoding to an algorithm rather than just a solution gives the PSO significantly more expressive power to find approximate solutions. The structure of candidate solutions may not be the same as binary strings  so several binary strings may map to the same solution. The resulting solution is then evaluated to give its cost indicating how well the algorithm fits data in form of a (possibly large) integer; this could include some cost representing the complexity of the used algorithm; lower values being preferred to higher values. This procedure gives a mapping from a binary string to a integer as a cost of the binary string. The SPSO is used to learn a low cost global solution by using a swarm of proposed solutions to iteratively search for a low cost one.  
+The link between COP and SPSO is forged by using binary strings to represent candidate algorithms which are obtained by decoding the string. I use the term algorithm to represent any method for finding approximate solutions to a COP problem including just providing an approximate solution with no use of an algorithm. I think decoding to an algorithm rather than just a solution gives the PSO significantly more expressive power to find approximate solutions. The structure of candidate solutions may not be the same as binary strings  so several binary strings may map to the same solution. The resulting solution is then evaluated by the cost-function to give its cost value indicating how well the algorithm fits; this could include some cost component representing the complexity of used algorithm; lower values being preferred to higher values as determined by \texttt{Comp()}. This procedure gives a mapping from a binary string to  cost  value of the binary string. The SPSO is used to learn a low cost global solution by using a swarm of proposed solutions to iteratively search for a low cost one.
+
+
+Even in the case of a deterministic  function it may be expedient to cut down on the evaluation time by only partially evaluating it thus introducing uncertainty. For instance the solution string may represent a \emph{program} that has to be tested on a ridiculously large number of cases to give a perfect cost value in this case the cases are randomly chosen to test the solution and thus introducing uncertainty which is traded against speed of evaluation. Once the cost value uncertainty is measured the cost-function can determine whether two solutions can be compared and feed this back to the SPSO via \texttt{Comp()}.  
 
 For the moment we restrict the SPSO state to be at most $N$ bits. Each binary string $x$ can thus be regarded as a subset of integers in the range $1 \cdots N$  where $j \in x$ when $x[j] = 1$. To this extent each non zero bit represents the inclusion of some element with a feature and as such encodings that favour this interpretation is expected to do better using the following algorithms. 
 
@@ -92,7 +130,7 @@ r_t^{(i,k)}& \mathrm{if}\: j \in del_t^{(i,k)}\\
 \end{align}
 the $\phi$ is a heuristic for tuning how aggressively the velocity points towards the  target particle k and here takes on a predetermined heuristic value between 0 and 2 (following tradition of continuous case). However, the velocity is limited to be in the range 0 to 1 since it is a probability of flipping, so values above 1 are reflected back. This doubles the density of $Vdel_t^{(i,k)}$ near 1 when  $\phi > 1$. The treatment of how to cope with $r(i,k) >1$ case is not well derived and  alternatives such as limiting all such cases to 1 may be better. The velocity increment encourages movement to the target $p_t^k$ by only contributing to the difference between $x_t^i$ and  $p_t^k$.
 \subsubsection{Shotgun Blurring of Targets }
-Typicaly there are a large number of elements (corresponding to dimensions in the continuous case) while the number of particles  is kept to just a few say at most 30. This means the use if just the velocity contributions directed to targets will explore only a small subset of changes. In the continuous case this has been solved in \cite{LcRiPSO} by adding a noise component to the velocity proportional to distance of particle from corresponding target, which effectively gives a shotgun effect. Further more this simple device makes the PSO converge to a local optimal solution.
+Typicaly there are a large number of elements (corresponding to dimensions in the continuous case) while the number of particles  is kept to just a few say at most 30. This means the use of just the velocity contributions directed to targets will explore only a small subset of changes. In the continuous case this has been solved in \cite{LcRiPSO} by adding a noise component to the velocity proportional to distance of particle from corresponding target, which effectively gives a shotgun effect. Further more this simple device makes the PSO converge to a local optimal solution.
 
 For SPSO the distance is the Hamming distance between the particle and target given by
 \begin{equation}\label{H-dist}
@@ -139,15 +177,320 @@ x_{t+1}^i &\leftarrow& \left\lbrace
 x_t^i&\mathrm{otherwise}
 \end{array}\right.
 \end{align} 
-this gives an update that satisfies the constraints, $\Omega$ where  the initalisation of the state $x_0^i$ is chosen to ensure it also satisfies the constraint. this is done by random selection until the application of  gives something that satisfies the constraint. Note during this operation the first argument will be the empty set and should be treated as a special case by the cost function.
+this gives an update that satisfies the constraints, $\Omega$ where  the initalisation of the state $x_0^i$ is chosen to ensure it also satisfies the constraint. this is done by random selection until the application of  \texttt{ToConstraint()} gives something that satisfies the constraint. Note during this operation the first argument will be the empty set and should be treated as a special case by the cost function.
 
-\subsection{Dealing With  Noisy Cost Function}
-In the targeted application of Machine Learning the cost-function $F(x)$ is not a direct mathematical function of $x$ and has a random component so it has to be evaluated several times before comparing the fitness of $x$. In the current context $\mathtt{ToConstraint()}$ can be used  to achieve this by returning a copy of $x_t^i$ for $\breve{x}_{t+1}^i$ but stating that constraints have not been satisfied. This has the side effect of not updating $p_{t+1}^i$ as well giving the opportunity to revaluate it. the cost-function has control of updates in this way and can delay update until it is satisfied that a comparison of costs is valid.
+\subsection{Updating the personal best}
+To cope with noisy cost-functions the comparator function Comp() has the option of not being able to compare two  cases but will indicate which case needs to be further evaluated to improve the chance of a successful  comparison. let $x$  and $y$ be two constraint satisfying subset cases from this we get the cost function values $F(x)$ and $F(y)$ we now attempt a comparison say by using Comp() method on $F(x)$ and we use the  following symbolic notation depending on the result as follows:
+
+\begin{tabular}{|c|c|c|}\hline
+$F(x).\mathtt{Comp}(F(y))$ & Operator& Comment\\
+\hline \hline 
+0& $F(x)=F(y)$& \\
+-1& $F(x)<F(y)$ &\\
+1&$F(x)>F(y)$ &\\
+-2&$F(x)\leftthreetimes F(y)$& $F(x)$ needs further evaluation\\
+2&$F(x)\rightthreetimes F(y)$& $F(y)$ needs further evaluation\\
+\hline	
+	
+\end{tabular}
+
+
 
 \subsection{grouping Swarm Particles } 
 It is anticipated  that the main things that improve the SPSO performance is change in heuristics and the method used to choose the target sets $N_t^i$. Further more it is expected that particles in the swarm will adopt specialist behaviour by belonging to a group of particles. To support this the swarm is  partitioned into groups where each group of swarm particles has the same set of targets and heuristics. Groups are each given a name to aid describing a group.To begin with there is one group called "root" which contains all particles. Heuristics are often the same between groups so when forming a new group the heuristics are linked to the "root" group, although this can be modified and in general groups share heuristics to simplify changing a heuristic. Groups are populated by moving swarm particles from other groups thus maintaining a partition of swarm. By default the heuristics are chosen to have useful values and need not be explicitly given.              
   	
-	
-	\bibliographystyle{alpha}
-	\bibliography{AiPlayC.bib}
+\section{How to deal with a noisy cost function?}
+
+In the targeted application of Machine Learning the cost-function $F(x)$ is not a direct mathematical function of $x$ and has a random component so it has to be evaluated several times before comparing the fitness of $x$. 
+
+The Particle Swarm Optimiser uses a personal best and global best
+set of parameters and costs to guide it in its optimisation. in the
+standard implementation this assumes that the cost function is deterministic
+to the extent that the cost is assumed to be a direct function of
+the parameters submitted to the cost function. However, this may not
+be the case when dealing with real data where there are hidden parameters
+that are not accounted for or the cost is a random function parametrised
+by $x$. This means that the personal best may be due
+to parameters with a fluke low cost which is rearly improved on during
+the optimisation and thus cause the process to stick at a non optimal
+value for typical behaviour. Furthermore the underlying statistics
+may be slowly changing as the cost is sampled. 
+
+\subsection{Recursive formula for calculating expected values}
+
+Let $b_{i}$ be a sequence of independent binary samples $b_{i}:S\rightarrow\{0,1\}$
+of a probability $P$. By defenition we have 
+\[
+P(b_{1,}\cdots,b_{n})=\prod_{i=1}^{n}P(b_{i})
+\]
+For a subset $A\subset S$ and a map $g:2^{A}\rightarrow\mathbb{R}$
+we can get a sequence of estimates of expected values
+\[
+\mathbb{E}_{n}[g\parallel A]=\frac{1}{n}\sum_{i=1}^{n}g(b_{i}\cap A)
+\]
+of 
+\[
+\mathbb{E}[g\parallel A]=\sum_{B\subset S}P(B)g(B\cap A)
+\]
+which just calculates the expected value of $g$ acting on subsets
+of $A$ . The double bar notation $\parallel$ is used to indicate
+that we are looking on to the probability disribution through the
+sub set window $A$. Now for $n>1$ 
+\[
+\mathbb{E}_{n}[g\parallel A]=\left(1-\frac{1}{n}\right)\mathbb{E}_{n-1}[g\mid A]+\frac{1}{n}g(b_{n}\cap A)
+\]
+we can generalise this to the sequence 
+\[
+\check{\mathbb{E}}_{n}[g\parallel A]=\left(1-\lambda_{n}\right)\mathbb{\check{E}}_{n-1}[g\parallel A]+\lambda_{n}g(b_{n}\cap A)
+\]
+with 
+\[
+\check{\mathbb{E}}_{1}[g\parallel A]=g(b_{1}\cap A)
+\]
+taking expected values and putting $\mathbb{\tilde{E}}_{n}[g\parallel A]=\mathbb{E}\left[\check{\mathbb{E}}_{n}[g\parallel A]\right]$
+we get
+\begin{align}
+\mathbb{\tilde{E}}_{n}[g\parallel A] & = (1-\lambda_{n})\mathbb{\tilde{E}}_{n-1}[g\parallel A]+\lambda_{n}\mathbb{E}[g\parallel A]\\
+& = (1-\lambda_{n})\mathbb{\mathbb{E}}[g\parallel A]+\lambda_{n}\mathbb{E}[g\parallel A]\\
+& = \mathbb{E}[g\parallel A]
+\end{align}
+
+by induction on $n$. So even this sequence is an unbiased estimate
+of the expected value. The important thing is to check for variance.
+We have
+\begin{align*}
+\mathbb{E}\left[\left(\mathbb{\check{E}}_{n}[g\parallel A]-\mathbb{E}[g\parallel A]\right)^{2}\right] & = \mathbb{E}\left[\left(\mathbb{\check{E}}_{n}[g\parallel A]\right)^{2}\right]-2\mathbb{E}\left[\mathbb{\check{E}}_{n}[g\parallel A]\right]\mathbb{E}[g\parallel A]+\mathbb{E}[g\parallel A]^{2}\\
+& = \mathbb{E}\left[\left(\mathbb{\check{E}}_{n}[g\parallel A]\right)^{2}\right]-\mathbb{E}[g\parallel A]^{2}\\
+& = (1-\lambda_{n})^{2}\mathbb{E}\left[\left(\mathbb{\check{E}}_{n-1}[g\parallel A]\right)^{2}\right]+\lambda_{n}^{2}\mathbb{E}\left[g(b_{n}\cap A)^{2}\right]+(2\lambda_{n}(1-\lambda_{n})-1)\mathbb{E}[g\parallel A]^{2}\\
+& = (1-\lambda_{n})^{2}\mathbb{E}\left[\left(\mathbb{\check{E}}_{n-1}[g\parallel A]\right)^{2}\right]+\lambda_{n}^{2}\mathbb{E}\left[g(b_{n}\cap A)^{2}\right]-((1-\lambda_{n})^{2}+\lambda_{n}^{2})\mathbb{E}[g\parallel A]^{2}\\
+& = (1-\lambda_{n})^{2}\mathbb{E}\left[\left(\mathbb{\check{E}}_{n-1}[g\parallel A]-\mathbb{E}[g\parallel A]\right)^{2}\right]+\lambda_{n}^{2}\mathbb{E}\left[\left(g(b_{n}\cap A)-\mathbb{E}[g\parallel A]\right)^{2}\right]
+\end{align*}
+where we have used the independence of the $b_{i}$'s to give
+\begin{align*}
+\mathbb{E}\left[\mathbb{\check{E}}_{n-1}[g\parallel A]g(b_{n}\cap A)\right] & = \mathbb{E}\left[\check{\mathbb{E}}_{n-1}[g\parallel A]\right]E\left[g(b_{n}\cap A)\right]\\
+& = \mathbb{E}[g\parallel A]^{2}
+\end{align*}
+put
+\begin{align*}
+\sigma^{2} & = \mathbb{E}\left[\left(g(b_{n}\cap A)-\mathbb{E}[g\parallel A]\right)^{2}\right]\\
+\alpha_{n} & = \nicefrac{\mathbb{E}\left[\left(\mathbb{\check{E}}_{n}[g\parallel A]-\mathbb{E}[g\parallel A]\right)^{2}\right]}{\sigma^{2}}
+\end{align*}
+then we have
+\[
+\alpha_{n}=(1-\lambda_{n})^{2}\alpha_{n-1}+\lambda_{n}^{2}
+\]
+as a formular that gives the change in variance of the estimates $\check{\mathbb{E}}_{n}[g\parallel A]$
+.
+
+As one can see there are several ways of combining measured means to give unbiased estimates of a noisy function's mean that gives a trade off on variance.
+ 
+
+
+To directly calculate the expected cost at each iteration would be too expensive an operation especially if the parameters are way off optimal. Let $C(X)$ be the random variable representing the cost function for a given parameter vector $X$. for a given particle the current parameter changes rapidly while when it matters the personal best parameter, $X_b$ varies comparatively slowly so  when the $X_b$ is not updated one can take the opportunity to update the estimated expected cost function value $\hat{C}(X_b)$ of $\mathbb{E}[C(X_b)]$ in this case.This reduces the variance of the expected value compared to its raw value $C(X_b)$. 
+
+Lets look at some ways in which the estimate in principle can be updated iteratively. Given samples $C_1,\cdots,C_i$ and a forgetting gain $\alpha$ we could produce an unbiased estimate
+\begin{equation}
+\label{est1}
+\hat{C}(X_b)_i=\frac{\sum_{j=1}^i\alpha^{j-1}C_{i-j+1}}{\sum_{j=1}^i\alpha^{j-1}}
+\end{equation}
+Put 
+\begin{align}
+A_i&=\sum_{j=1}^i\alpha^{j-1}\\
+\label{sum_a}
+&=\frac{1-\alpha^i}{1-\alpha}
+\end{align}
+then using \eqref{est1} we get
+\begin{align}
+A_{i}\hat{C}(X_b)_{i}-\alpha A_{i-1}\hat{C}(X_b)_{i-1}=C_i
+\end{align}
+rearranging and using \eqref{sum_a} we get
+\begin{align}
+\hat{C}(X_b)_{i}&=\frac{\alpha A_{i-1}\hat{C}(X_b)_{i-1}+C_i}{A_{i}}\\
+\label{est2}
+&=\frac{\alpha(1-\alpha^{i-1})\hat{C}(X_b)_{i-1}+(1-\alpha)C_i}
+{1-\alpha^{i}}
+\end{align}
+now if we put 
+\begin{equation}\label{lam1}
+\lambda_i=\frac{1-\alpha}{1-\alpha^{i}}
+\end{equation}
+we get substituting into \eqref{est2} the iterative update
+\begin{equation}\label{est3}
+\hat{C}(X_b)_{i}=(1-\lambda_i)\hat{C}(X_b)_{i-1}+\lambda_i C_i
+\end{equation}
+In fact any update of the form given in \eqref{est3} always gives an unbiased estimate  for arbitrary $\lambda_i$ . So we can use this as a generalised update. the choice of parameter is tuned to cater for how rapidly one wants to converge and the required variance of the result.
+
+Looking at the variance update assuming independent samples. Put $\sigma_i^2$ as the variance of $\hat{C}(X_b)_{i}$ and $\sigma^2$ as the variance of $C_i$ then we get
+\begin{equation}\label{vari1}
+\sigma_i^2=(1-\lambda_i)^2\sigma_{i-1}^2 +\lambda_i^2 \sigma^2
+\end{equation} 
+The minimum value of the update variance as a function of $\lambda_i$ occurs at the point of inflexion given by
+\begin{align}
+0=&\frac{\partial \sigma_i^2}{\partial \lambda_i}\\
+=&-2(1-\lambda_i)\sigma_{i-1}^2+2\lambda_i \sigma\\
+=&2\{ \lambda_i(\sigma_{i-1}^2 + \sigma^2) -\sigma_{i-1}^2\}
+\end{align} 
+This gives the smallest variance $\lambda_i$ as
+\begin{align}
+\stackrel{*}{\lambda_i} &= \frac{\sigma^2}{\sigma_{i-1}^2 + \sigma^2}\\
+&=\frac{1}{1+(\frac{\sigma^2}{\sigma_{i-1}^2})} \label{lam_st1}\\
+&=\frac{\sigma^{-2}}{\sigma_{i-1}^{-2} + \sigma^{-2}}
+\label{lam_st2}
+\end{align}
+From \eqref{lam_st2} we get
+\begin{equation}\label{lam_st3}
+1-\stackrel{*}{\lambda_i} =\frac{\sigma_{i-1}^{-2}}{\sigma_{i-1}^{-2} + \sigma^{-2}} 
+\end{equation}
+\eqref{lam_st1} show that the result depends only on the ratio of variances while \eqref{lam_st2} gives the result in form of inverse variance. using this gives easy to use results as will shortly be seen. Based in this remark substitute \eqref{lam_st2},\eqref{lam_st3} into \eqref{vari1} and calculate the updated inverse variance as
+\begin{align}
+\stackrel{*}{\sigma_i}^{-2}&=((1-\stackrel{*}{\lambda_i})^2\sigma_{i-1}^2 +\stackrel{*}{\lambda_i}^2 \sigma^{2})^{-1}\\
+&=\frac{\sigma_{i-1}^{-2} \sigma^{-2}}{(1-\stackrel{*}{\lambda_i})^2\sigma^{-2} +\stackrel{*}{\lambda_i}^2 \sigma_{i-1}^{-2}}\\
+&=\frac{\sigma_{i-1}^{-2}\sigma^{-2}(\sigma_{i-1}^{-2} + \sigma^{-2})^2 }{\sigma_{i-1}^{-4}\sigma^{-2} + \sigma_{i-1}^{-2}\sigma^{-4}}\\
+&=\sigma_{i-1}^{-2}+\sigma^{-2} \label{inv_var1}
+\end{align}  
+This shows the inverse variance using the optimal $\lambda$ is additive and the expression is particularly simple so it can be calculated first and then $\stackrel{*}{\lambda_i}$ is evaluated from
+\begin{equation}\label{lam_st4}
+\stackrel{*}{\lambda_i}=\sigma^{-2}/\stackrel{*}{\sigma_{i}}^{-2}
+\end{equation} 
+This gives the minimum variance update. However in the long run as it repeats the $\lambda_i$ becomes so small that it ignores the current measurement and any change in the underlying statistics is ignored. We can avoid this by deliberately choosing a $\lambda_i$ which is larger than the optimal given by \eqref{lam_st4}. To this end put 
+\begin{equation}\label{nlam1}
+\lambda_i = (1+\delta)\stackrel{*}{\lambda_i}
+\end{equation} 
+then evaluate the updated inverse variance by substituting into
+\eqref{vari1} the expression \eqref{nlam1} and simplifying using \eqref{inv_var1},\eqref{lam_st2} and \eqref{lam_st3}
+\begin{align}
+\sigma_i^{-2}&= \frac{\sigma^{-2} \sigma_{i-1}^{-2}}
+{[(1-\stackrel{*}{\lambda_i})-\delta \stackrel{*}{\lambda_i}]^2\: \sigma^{-2}+\stackrel{*}{\lambda_i}^2 (1+\delta)^2\: \sigma_{i-1}^{-2}}\\
+&= \frac{\sigma^{-2} \sigma_{i-1}^{-2}}{(1-\stackrel{*}{\lambda_i})^2\:\sigma^{-2}+ \stackrel{*}{\lambda_i}^2\:\sigma_{i-1}^{-2} 
+	-2(1-\stackrel{*}{\lambda_i})\:\sigma^{-2}
+	+2\stackrel{*}{\lambda_i}\sigma_{i-1}^{-2}
+	+\stackrel{*}{\lambda_i}^2\delta^2(\sigma^{-2}+\sigma_{i-1}^{-2}) }	\\
+&=\frac{\sigma^{-2}\sigma_{i-1}^{-2}\stackrel{*}{\sigma_i}^{-4} } 
+{\sigma^{-2}\sigma_{i-1}^{-2}\stackrel{*}{\sigma_i}^{-2}+\sigma^-4 \stackrel{*}{\sigma_i}^{-2}\delta^2 }\\
+&=\frac{\stackrel{*}{\sigma_i}^{-2}}
+{1+\sigma^{-2}/\sigma_{i-1}^{-2}\:\delta^2 }\label{nlam2}
+\end{align}
+
+Equation \eqref{nlam2} is a particularly simple expression that shows how the inverse variance depends on $\delta$.
+
+
+Most models of probability distribution start with combining pairs
+of variables to give more elaberate models of the probability function.
+Often in the case of neural nets the pairs are combined linearly
+to give a single linear function which is then thresholded before
+being passed onto an output or hidden layer. Unfortunately this in
+the case of neural nets gives rise to difficult to interpret models
+with with often pathological behaviour. The aim here is to use the
+multilinear approach that encourages more unique representation of
+the data which can also be interpreted. However multi-linear functions
+are only linear on each variable in isolation and are in general non
+linear, hopefully in a useful way. When combining pairs of variables
+we will combine to produce a result for a hidden variable (or output
+from this ) and not threshold it. This section gives
+results for combining pairs of variables. 
+
+\section{Multi-linear functions and binary data probabilities}
+
+Multi-linear expressions are a natural way of generating functions of
+binary data. Let $S$ be a finite ordered set of size $n$ containing
+the elements $x_{1},x_{2},\cdots,x_{n}$ then we can for each binary
+sequence $a:S\rightarrow\{0,1\}$ of $n$ $0$ and $1$'s associate
+a subset $\varphi(a)\subset S$ given as the elements $x_{i}$ of
+$S$ such that the sequence $a$ maps $a(i)$ to $1$. Put for $A\subset S$
+\[
+Q(A)[x_{1},x_{2},\cdots,x_{n}]=\prod_{x_{i\in A}}x_{i}\prod_{x_{j}\notin A}(1-x_{j})
+\]
+Let $A,B\subset S$ such that $A\neq B$ then there exists an $k$
+such that either $x_{k}\in A$ and $x_{k}\notin B$ or $x_{k}\in B$
+and $x_{k}\notin A$ . assuming the former and let b be the associated
+binary sequence of $B$. Evaluating $Q(A)$ with b we get that $b(k)=0$
+so 
+\[
+Q(A)(b)\triangleq Q(A)(b(1),b(2),\ldots,b(n))=\prod_{x_{i\in A}}b(i)\prod_{x_{j}\notin A}(1-b(j))=0
+\]
+similarly for the other case. Also $Q(B)(b)=1$ by inspection. This
+also shows that the $Q(A)[x_{1},x_{2},\cdots,x_{n}]$ are linearly
+independent since if
+\[
+\sum_{A\subset S}c(A)Q(A)[x_{1},x_{2},\cdots,x_{n}]=0
+\]
+for coefficients $c(A)\in\mathbb{R}$ by substituting $a=\varphi^{-1}(A)$
+we get
+\[
+c(A)=c(A)Q(A)(a)=0
+\]
+If we put for $A\subset S$
+\[
+\widetilde{Q}(A)[x_{1},x_{2},\cdots,x_{n}]=\prod_{x_{i\in A}}x_{i}
+\]
+then by induction on $n$ we can show that $Q(A)$ is a linear combination
+of $\widetilde{Q}(A)$. Also by definition the $\widetilde{Q}(A)$
+are independent and have the same number of dimensions $2^{n}$ so
+span the same subspace of polynomials. Because of this the $Q(A)$
+for $A\subset S$ span the space of \emph{multilinear polynomials}.
+
+Further for each map $f:\,2^{S}\rightarrow\mathbb{R}$ we can associate
+a a polynomial $Q(f)$ over the elements of $S$ given by
+\[
+Q(f)[x_{1},x_{2},\cdots,x_{n}]=\sum_{A\subset S}f(A)Q(A)
+\]
+and we get 
+\[
+Q(f)(b)=f(\varphi(b))
+\]
+This multi-linear or polynomial representation of the map $f$ is
+in one to one correspondence so there is nothing added by using the
+more complex polynomial representation of the map from subsets of
+$S$ other than providing a smooth continuous representation of such
+functions that can be easily approximated by simple combination of
+polynomials that can be used to provide a more compact approximation
+of $f$. In the general case $Q(f)$ is a large expression to evaluate
+or store in a computer since it has $2^{n}$ terms. Also the coefficients
+by themselves do not convey any useful structure or pattern without
+further analysis. The question is can one introduce more restrictive
+polynomial expressions that approximate $Q(f)$ and give easy interpretations
+of the underlying patterns of sequences that generate significant
+values of $f$ without significant loss of information.
+
+In particular if $P(a)$ is the probability of the sequence $a$ then
+$Q(P\circ\varphi^{-1})$ is a polynomial that maps binary sequences
+to their respective probability. Call this the \emph{probability polynomial}
+and Use the notation $Q_{P}[x_{1},x_{2},\cdots,x_{n}]$ for this.
+The $\varphi$ map is an equivalence between subsets and binary sequences
+so when not ambiguous leave it out. For instance $P(A)\triangleq P(\varphi^{-1}(A))$
+for a subset $A$.
+
+As a general rule low order polynomial representations avoid over
+fitting so polynomials involving a small number of variables ( that
+is elements of $S$ ) are useful. in particular combining variables
+in pairs is useful especially if we create intermediate variables
+called hidden  that represent linear polynomials of variables
+and hidden variables. 
+\subsection{bivariate binary table polynomial representation}
+let $x$ and $y$ be binary valued variables. let $a:\{0,1\}\times\{0,1\}\rightarrow\{0,1\}$ be a function. this is  represented by a polynomial
+\begin{align}
+Q(a)[x,y]=&a(0,0)(1-x)(1-y)+a(0,1)(1-x)y + a(1,0)x(1-y)+a(1,1)xy \\
+=&a(00)+[a(1,0)-a(0,0)]x+[a(0,1)-a(0,0)]y+[a(0,0)+a(1,1)-a(0.1)-a(1,0)]xy
+\end{align} 
+that agrees with the binary function $a$ for binary values. we can get a clean uncluttered parametrisation by putting
+\begin{align}
+X_0&=a(0,0)\\
+X_1&=a(1,0)-a(0,0)\\
+X_2&=a(0,1)-a(0,0)\\
+x_3&=a(1,1)-a(0,0)\\
+\end{align}   
+to give 
+\begin{equation}
+\label{bin1}
+Q(a)[x,y]=X_0+X_1x+X_2y+(X_3-X_1-X_2)xy
+\end{equation}
+
+
+
+
+\bibliographystyle{alpha}
+\bibliography{AiPlayC.bib}
+
+
+
 \end{document}
