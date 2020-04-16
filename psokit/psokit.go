@@ -3,6 +3,7 @@ package psokit
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/mathrgo/setpso"
 )
@@ -38,7 +39,7 @@ sequence. the supported interfaces are:
 		ActResult // post run Action
 		ActSummary // post runs Action
 */
-type CreateAct interface{ Create(sd int64) Act }
+//type CreateAct interface{ Create() Act }
 
 /*
 ActInit is the interface for pre runs initialising Action. This is expected to
@@ -103,7 +104,7 @@ type ManPso struct {
 	// description of Actions by name
 	actd map[string]string
 	// pointers to added action creator
-	addedAct map[string]CreateAct
+	addedAct map[string]Act
 	// actions by point of application
 	actInit    []ActInit
 	actRunInit []ActRunInit
@@ -157,7 +158,7 @@ func NewMan() *ManPso {
 	man.addedPso = make(map[string]CreatePso)
 	man.loadPsoDescription()
 	man.actd = make(map[string]string)
-	man.addedAct = make(map[string]CreateAct)
+	man.addedAct = make(map[string]Act)
 	man.actInit = make([]ActInit, 0, 10)
 	man.actRunInit = make([]ActRunInit, 0, 10)
 	man.actUpdate = make([]ActUpdate, 0, 10)
@@ -201,6 +202,7 @@ String gives a description of the man settings
 func (man *ManPso) String() string {
 	s := "ManPso Settings:\n"
 	s += fmt.Sprintf("cost-function = %s\t", man.funCase)
+	
 	s += fmt.Sprintf("SPSO = %s\n", man.psoCase)
 	if man.dbug {
 		s += fmt.Sprintf("Detailed debug for %d iterations\n", man.stopAt)
@@ -317,6 +319,7 @@ func (man *ManPso) Run() {
 		man.actInit[i].Init(man)
 	}
 	for man.runid = 0; man.runid < man.nrun; man.runid++ {
+		start := time.Now()
 		man.iter = 0
 		man.Init()
 		for i := range man.actRunInit {
@@ -337,10 +340,12 @@ func (man *ManPso) Run() {
 		for i := range man.actResult {
 			man.actResult[i].Result(man)
 		}
+		fmt.Printf("Elapsed time of Run: %f min\n", time.Now().Sub(start).Minutes())
 	}
 	for i := range man.actSummary {
 		man.actSummary[i].Summary(man)
 	}
+
 }
 
 /*
@@ -413,7 +418,8 @@ AddAct adds an Action instance creator to man for it to use later on.
 the Action has the name name and description desc. If the Action already exists
 it is not added and an error message is returned.
 */
-func (man *ManPso) AddAct(name, desc string, a CreateAct) error {
+func (man *ManPso) AddAct(name, desc string, a Act) error {
+	fmt.Printf("adding action %s\n", name)
 	if man.actd[name] == "" {
 		man.actd[name] = desc
 		man.addedAct[name] = a

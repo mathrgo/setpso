@@ -256,7 +256,9 @@ func (pso *Pso) UpdateGroup(g *Group) {
 	for i := range g.members[1:] {
 		id := g.members[i]
 		p := &pso.Pt[id]
-		if p.best.Cmp(g.bestCost) < 0 {
+		compResult := pso.CleanCmp(p.best, g.bestCost,
+			p.bestParams, pso.Pt[g.bestMember].bestParams)
+		if compResult < 0 {
 			g.bestCost.Set(p.best)
 			g.bestMember = id
 		}
@@ -392,6 +394,23 @@ func (pso *Pso) BlurTarget(x *big.Int, id int, l, l0 float64) {
 }
 
 /*
+CleanCmp ensures that the cost functions cost1,cost2 at parameters param1,param2 can be compared by aplying updates until the Cmp function can return a comparison
+*/
+func (pso *Pso) CleanCmp(cost1, cost2 futil.CostValue,
+	param1, param2 *big.Int) int {
+	compResult := cost1.Cmp(cost2)
+	for compResult > 1 || compResult < -1 {
+		if compResult > 1 {
+			cost2.Update(pso.fun.Cost(param2))
+		} else {
+			cost1.Update(pso.fun.Cost(param1))
+		}
+		compResult = cost1.Cmp(cost2)
+	}
+	return compResult
+}
+
+/*
 SetParams sets the parameters of the id th particle updating  the resulting
 cost and  personal best case. It also revaluates the personal best cost in
 case the function has changed.
@@ -402,9 +421,13 @@ func (pso *Pso) SetParams(id int) {
 	// subset
 	if pso.fun.ToConstraint(p.params, p.hint) {
 		p.params.Set(p.hint)
-		p.best.Set(pso.fun.Cost(p.bestParams))
-		p.cost.Set(pso.fun.Cost(p.params))
-		if p.cost.Cmp(p.best) < 0 {
+		rawBest := pso.fun.Cost(p.bestParams)
+		p.best.Update(rawBest)
+		rawCost := pso.fun.Cost(p.params)
+		p.cost.Set(rawCost)
+		compResult := pso.CleanCmp(p.cost, p.best, p.params, p.bestParams)
+
+		if compResult < 0 {
 			p.best.Set(p.cost)
 			p.bestParams.Set(p.params)
 		}
@@ -665,6 +688,8 @@ type CLpart struct {
 	pc float64
 	// last best cost while pursuing the current target
 	lastBest futil.CostValue
+	// lastbest parameter while pursuing the current target
+	lastBestParams *big.Int
 	// failure to improve count while pursuing current target
 	gapCount int
 }
@@ -697,6 +722,7 @@ func NewCLPso(p *Pso) *CLPso {
 		c := &pso.clPt[i]
 		c.pc = Pc0(i, n)
 		c.lastBest = pso.fun.NewCostValue()
+		c.lastBestParams = big.NewInt(0)
 		c.gapCount = -1 // play safe
 		gp := pso.CreateGroup(string(i), 1)
 		pso.MoveTo(gp, i)
@@ -725,7 +751,11 @@ func (p *CLPso) Update() {
 			if p.rnd.Float64() < c.pc {
 				i1 := p.rnd.Intn(p.Nparticles())
 				i2 := p.rnd.Intn(p.Nparticles())
-				if (p.LocalBestCost(i1)).Cmp(p.LocalBestCost(i2)) < 0 {
+				compResult := p.CleanCmp(p.LocalBestCost(i1),
+					p.LocalBestCost(i2),
+					p.LocalBestParameters(i1),
+					p.LocalBestParameters(i2))
+				if compResult < 0 {
 					p.SetGroupTarget(g, i1)
 				} else {
 					p.SetGroupTarget(g, i2)
@@ -735,11 +765,15 @@ func (p *CLPso) Update() {
 			}
 		} else {
 			cost := p.Pt[i].cost
+			params := p.Pt[i].params
 			if c.gapCount < 0 {
 				c.lastBest.Set(cost)
+				c.lastBestParams.Set(params)
 				c.gapCount++
-			} else if c.lastBest.Cmp(cost) > 0 {
+			} else if p.CleanCmp(c.lastBest, cost,
+				c.lastBestParams, params) > 0 {
 				c.lastBest.Set(cost)
+				c.lastBestParams.Set(params)
 				c.gapCount = 0
 			} else {
 				c.gapCount++

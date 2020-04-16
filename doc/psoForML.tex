@@ -1,4 +1,4 @@
-\documentclass[a4paper,oneside,english]{article}
+\documentclass[a4paper,oneside,english]{book}
 
 \usepackage[sc,osf]{mathpazo}
 \usepackage{units}
@@ -20,6 +20,14 @@
 	\title{Experiments in Developing Discrete Particle Swarm Optimisers}
 	\author{Martin Gate}
 	\maketitle
+	\tableofcontents\newpage
+	
+	\part[Algorithms]{Algorithm Description and Justification}
+	\chapter{Optimiser to Function Split}
+	\section{Setting the  Scene}
+	In many cases an organism in nature has a goal to survive well in a changing environment it does this by actuating various limbs under the control of a brain that is trying to get a good outcome. The degree of effort and lack of a good outcome  can be regarded as a \emph{cost} that depends on the  environment  and sequence of actions that it has under its control. The brain is looking for a \emph{program}  to give good results most of the time so that it can respond effortlessly to changes of environment. Sometimes the program gives a costly outcome and the organism must modify the program. I believe such tweaking is done by random choice anything else such as deductive reasoning is really part of the program. Of course such choice will be biased towards cases that worked in the past. As such the  program to outcome cost is like a \emph{function } but with random fluctuation since the  same program may produce different outcomes depending on the environment. The \emph{program} in this context can be regarded as \emph{input} to the function to give a cost while the directed random choice is to be regarded as an \emph{optimiser}; by its nature the optimiser cannot see into the workings of this function otherwise it would be part of the function; all it has is the cost associated with the input as program and the constraint that the chosen input is indeed a working program. the rest of this book will be exploring the relation between function and optimiser, generating algorithms to implement them and apply  to hopefully interesting  cases that are models of environments that reflect real world behaviour.
+	
+	\chapter{Set Particle Swarm Optimiser}
 \section{Introduction}
 \subsection{Continuous Case model}
 Particle Swarm Optimisers (PSO) introduced in \cite{KE-pso} have been developed to optimise problems with continuous tuning parameters. The PSO consists of a finite collection (called a swarm) of particles with current state (often called \textit{Parameters}) $x_t^i$ personal best state $p_t^i$ and velocity $V_t^i$; where $i$ is the particle index and $t$ is the iteration index. These three properties of each particle are updated at every iteration using 
@@ -44,7 +52,7 @@ For  Machine Learning there is a need to extend the basic SPSO to cope with:
 	\item noisy data mainly due to a restricted amount of available data when evaluating a cost-function. 
 	\item represent continuous state such as design or neural net parameters by a set of discrete values some what similar to the way genetic algorithms deal with this by digitizing the continuous case.
 	\item treat random strings of bits as a way of generating useful programs  to find optimising solutions which in turn can be used as a way of tuning meta parameters.
-	\item Acknowledge that only approximate solutions are  needed to avoid over fitting. 
+	\item Acknowledge need to avoid over fitting and that only approximate solutions are needed. 
 \end{enumerate}  
 \subsection{Implementation and Development}
 The SPSO is developed mainly through biased intuitive analogy with  other systems. As such it needs a programming language to explore empirically its properties and implement it. The language chosen is Golang. The treatment of SPSO here attempts to make the description language agnostic, however sometimes golang constructs such as interface are directly used to simplify the description of algorithms and help the user understand what the code is trying to do.     
@@ -53,9 +61,10 @@ The SPSO is developed mainly through biased intuitive analogy with  other system
 \subsection{Cost-function Value Representation}   
 COP problems are discrete in nature and often have an integer cost-function value, because of this big integer cost values was initially used for SPSO.  The restriction to big integer is strictly not required since the cost function is used only to compare the cost between solutions so the cost function value in the software is represented by the interface type \texttt{CostValue}. This has the additional advantage that it can contain state to help deal with noisy data that needs to be evaluated several times to reduce the noise and store its variance.
 
-Formaly \texttt{CostValue} object \texttt{cost} has the following interface methods were \texttt{x} is to be kept general to avoid a circular definition, but is expected to  have a type that can be converted to the cost value object being used:
+Formaly \texttt{CostValue} object \texttt{cost} has the following interface methods were \texttt{x} is to be kept general to avoid a circular definition, but is expected to  have a type that can be converted to the cost value object being used; In this case \texttt{x} is a raw cost issued by the cost function  :
 \begin{list}{}
-	\item \texttt{cost.Set(x interface\{\})} this sets the oject to a copy of the value \texttt{x}. 
+	\item \texttt{cost.Set(x interface\{\})} this sets the object to a copy of the value \texttt{x}. 
+	\item \texttt{cost.Update(x interface\{\})} this combines \texttt{x} with the internal state stored by \texttt{cost} usualy to generate a cost with reduced variance to aid comparison with other costs.
 	\item \texttt{cost.Cmp(x interface\{\}) int} this compares the cost value object with x and returns the following values:
 		\begin{list}{}
 		\item $-2$ \texttt{cost} needs to be further evaluated to establish a comparison.
@@ -65,7 +74,8 @@ Formaly \texttt{CostValue} object \texttt{cost} has the following interface meth
 		\item $\quad 2$ \texttt{x} needs to be further evaluated to establish a comparison.
 		\end{list}
 	
-	\item \texttt{cost.Fbits() float64} this returns a logarithmic like floating point value for plotting; it attempts to give the number of bits  used in the big integer case. In most cases the cost is always positive in which case a zero cost returns $0$.
+	\item \texttt{cost.Fbits() float64} this returns a logarithmic like floating point value for plotting; it attempts to give the number of bits  used in the big integer case for positive integer. A zero cost returns $0$. To illustrate, this function for continuous deterministic  case  would be:
+	\[ Fbits=\mathrm{sign}(cost)\log_2(1+|cost|)   \]
 
 \end{list}
 As can be seen the underlying implementation of the cost value is well hidden from SPSO by using this interface it allows the cost-function to have a range of implementations  of its cost value which could include big integers, floating point, or even strings representing programs! 
@@ -78,7 +88,7 @@ Big integer cost values are used to include some of the difficult cases in combi
 
 
 \subsection{The Importance of Satisfying Constraint on Solutions }
-COP problems such as the Travelling Sales Person(TSP) have constraints defining $\varOmega$ that must be satisfied if to be of any use so one must continuously ensure the candidate solution is in $\varOmega$ before evaluating its cost. Often feasible points $\varOmega$ do not form an open subset of the space of states so a raw update of $x_t^i$ will not give a feasible state most of the time. To cope with this $\xi$ computes a raw update $\breve{x}_{t+1}^i$ which it then attempts to  convert into a feasible one before being returned as a update. Sometimes this may not be possible and the returned $x_t^i$ is not in $\varOmega$. As indicated in the update equation this results in no change to the personal best thus ensuring that personal bests are updated to only feasible states.   
+COP problems such as the Travelling Sales Person(TSP) have constraints defining $\varOmega$ that must be satisfied if to be of any use so one must continuously ensure the candidate solution is in $\varOmega$ before evaluating its cost. Often feasible points $\varOmega$ do not form an open subset of the space of states so a raw update of $x_t^i$ will not give a feasible state most of the time. To cope with this $\xi$ computes a raw update $\breve{x}_{t+1}^i$ which it then attempts to  convert into a feasible one before being returned as a update. Sometimes this may not be possible and the returned $x_t^i$ is not in $\varOmega$. As indicated in the update equation this results in no change to the personal best thus ensuring that personal bests are updated to only feasible states.   To acheive a working alternative  in $\varOmega$ the  cost function does this. 
 
 \subsection{Generalised Link Between COP and SPSO}
 The link between COP and SPSO is forged by using binary strings to represent candidate algorithms which are obtained by decoding the string. I use the term algorithm to represent any method for finding approximate solutions to a COP problem including just providing an approximate solution with no use of an algorithm. I think decoding to an algorithm rather than just a solution gives the PSO significantly more expressive power to find approximate solutions. The structure of candidate solutions may not be the same as binary strings  so several binary strings may map to the same solution. The resulting solution is then evaluated by the cost-function to give its cost value indicating how well the algorithm fits; this could include some cost component representing the complexity of used algorithm; lower values being preferred to higher values as determined by \texttt{Comp()}. This procedure gives a mapping from a binary string to  cost  value of the binary string. The SPSO is used to learn a low cost global solution by using a swarm of proposed solutions to iteratively search for a low cost one.
@@ -145,7 +155,7 @@ where $L_{factor}$ and $L_{offset}$ are heuristics used to tune the shotgun effe
 \subsubsection{Inertia Term}
 A heuristc $\omega$ borrowed from the continuous case is an inertia  term that multiplies the velocity probability by a reducing factor to slow down the progress of a particle and stop the velocity terms from over saturation.
 
-Using the multiplying operation is a crude and simple and may not be the best; the mapping from pseudo-addition to addition given in Equation \ref{add-map} suggests a more complex operation involving raing the probability of not flipping to some power. However, for the moment, simpler operation of multiplying which has the desired reduction of velocity is used here.
+Using the multiplying operation is crude and simple, which may not be the best; mapping from pseudo-addition to addition given in Equation \ref{add-map} suggests a more complex operation involving raising the probability of not flipping to some power. However, for the moment, simpler operation of multiplying which has the desired reduction of velocity is used here.
      
 \subsubsection{Combining the Velocity Contributions}
 
@@ -192,7 +202,8 @@ $F(x).\mathtt{Comp}(F(y))$ & Operator& Comment\\
 2&$F(x)\rightthreetimes F(y)$& $F(y)$ needs further evaluation\\
 \hline	
 	
-\end{tabular}
+\end{tabular}\newline
+To get a comparison of costs between two subset cases $x$ and $y$  the optimiser  calls the cost function again when it needs  further evaluation and updates the cost  value with the new raw  value  from the cost function until there is enough drop in variance to do the comparison the \texttt{CostValue} is designed to ensure  that the costs are deemed equal if the variances cannot be reduced enough to discriminate between $F(x)$ and $F(y)$ so the comparison process is finite.
 
 
 
@@ -215,14 +226,14 @@ to parameters with a fluke low cost which is rearly improved on during
 the optimisation and thus cause the process to stick at a non optimal
 value for typical behaviour. Furthermore the underlying statistics
 may be slowly changing as the cost is sampled. 
+\part{Miscellaneous Ideas}
+\chapter{Statistics}
+\section{Recursive formula for calculating expected values}
 
-\subsection{Recursive formula for calculating expected values}
+Let $S$ be a finite set and $P:2^S \longrightarrow [0,1]$ be the probability of subsets of $S$
+Let $b_{i}$ be a sequence of independent samples of subsets of $S$ 
+representing $P$. 
 
-Let $b_{i}$ be a sequence of independent binary samples $b_{i}:S\rightarrow\{0,1\}$
-of a probability $P$. By defenition we have 
-\[
-P(b_{1,}\cdots,b_{n})=\prod_{i=1}^{n}P(b_{i})
-\]
 For a subset $A\subset S$ and a map $g:2^{A}\rightarrow\mathbb{R}$
 we can get a sequence of estimates of expected values
 \[
@@ -234,7 +245,7 @@ of
 \]
 which just calculates the expected value of $g$ acting on subsets
 of $A$ . The double bar notation $\parallel$ is used to indicate
-that we are looking on to the probability disribution through the
+that we are looking on to the probability distribution through the
 sub set window $A$. Now for $n>1$ 
 \[
 \mathbb{E}_{n}[g\parallel A]=\left(1-\frac{1}{n}\right)\mathbb{E}_{n-1}[g\mid A]+\frac{1}{n}g(b_{n}\cap A)
@@ -279,7 +290,7 @@ then we have
 \[
 \alpha_{n}=(1-\lambda_{n})^{2}\alpha_{n-1}+\lambda_{n}^{2}
 \]
-as a formular that gives the change in variance of the estimates $\check{\mathbb{E}}_{n}[g\parallel A]$
+as a formulae that gives the change in variance of the estimates $\check{\mathbb{E}}_{n}[g\parallel A]$
 .
 
 As one can see there are several ways of combining measured means to give unbiased estimates of a noisy function's mean that gives a trade off on variance.
@@ -375,9 +386,9 @@ Equation \eqref{nlam2} is a particularly simple expression that shows how the in
 
 
 Most models of probability distribution start with combining pairs
-of variables to give more elaberate models of the probability function.
+of variables to give more elaborate models of the probability function.
 Often in the case of neural nets the pairs are combined linearly
-to give a single linear function which is then thresholded before
+to give a single linear function which is then threshold before
 being passed onto an output or hidden layer. Unfortunately this in
 the case of neural nets gives rise to difficult to interpret models
 with with often pathological behaviour. The aim here is to use the

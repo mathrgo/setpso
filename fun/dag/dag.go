@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+
+	"github.com/mathrgo/setpso/fun/futil"
 )
 
 /*
@@ -65,8 +67,11 @@ type FunBool struct {
 	input *big.Int
 	//temporary store of output
 	output *big.Int
-	// temporary store of cost
+	// temporary store of cost value
 	cost *big.Int
+	// store of cost value for optimiser
+	costValue *futil.IntCostValue
+
 	// temporary store of difference between output and required output
 	// cost
 	difCost *big.Int
@@ -257,6 +262,7 @@ func NewFunBool(nnode, nbitslookback int, opt OptBool, sizeCostFactor int64,
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
+		futil.NewIntCostValue(),
 		big.NewInt(0),
 		opt,
 		sampler,
@@ -288,7 +294,7 @@ where
 
 using random samples.
 */
-func (f *FunBool) Cost(x *big.Int) *big.Int {
+func (f *FunBool) Cost(x *big.Int) futil.CostValue {
 	f.Idecode(x) // assume satisfies constraints
 	f.difCost.SetInt64(0)
 	f.cost.SetInt64(int64(f.structureCost))
@@ -331,8 +337,9 @@ func (f *FunBool) Cost(x *big.Int) *big.Int {
 	}
 	f.difCost.Mul(f.difCost, f.sizeCostFactor)
 	f.cost.Add(f.cost, f.difCost)
+	f.costValue.Set(f.cost)
 
-	return f.cost
+	return f.costValue
 }
 
 // MaxLen returns the number of elements (bits) for the encoding.
@@ -417,6 +424,11 @@ func (d *Dag) DecodeDag(z *big.Int) (s string) {
 // it returns true if the function takes the hint
 func (f *FunBool) Delete(i int) bool {
 	return false
+}
+
+//NewCostValue creates zero cost value
+func (f *FunBool) NewCostValue() futil.CostValue {
+	return futil.NewIntCostValue()
 }
 
 /*

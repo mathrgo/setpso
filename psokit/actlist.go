@@ -27,14 +27,21 @@ func (man *ManPso) SelectActs(ac ...string) error {
 			a = new(PlotPersonalBest)
 		case "use-cmd-options":
 			a = new(CmdOptions)
+		case "run-progress":
+			a = new(RunProgress)
 		default:
-			return fmt.Errorf("Action: %s not found", name)
+			a = man.addedAct[name]
+			//fmt.Printf("found: %v\n", a)
+			if a == nil {
+				return fmt.Errorf("Action: %s not found", name)
+			}
 		}
 		//load actions into activity slots to be used while running man
 		if ai, ok := a.(ActInit); ok {
 			man.actInit = append(man.actInit, ai)
 		}
 		if ari, ok := a.(ActRunInit); ok {
+			//fmt.Printf("RunInit for: %s\n", name)
 			man.actRunInit = append(man.actRunInit, ari)
 		}
 		if au, ok := a.(ActUpdate); ok {
@@ -63,7 +70,9 @@ func (man *ManPso) loadActDescription() {
 		"print-result":       "Print final result at end of run; using Printresult ",
 		"print-headings":     "Prints setup and run headings; using Printheading",
 		"plot-personal-best": "Plots the personal best during a run; using PlotPersonalBest",
-		"use-cmd-options":    "Use command options to change configuration; using CmdOptions"}
+		"use-cmd-options":    "Use command options to change configuration; using CmdOptions",
+		"run-progress":       "Prints run progress; using RunProgress",
+	}
 }
 
 /*
@@ -96,7 +105,8 @@ func (a *Printresult) Result(man *ManPso) {
 	p := man.P()
 	f := man.F()
 	fmt.Printf("RUN %d:\n", man.RunID())
-	fmt.Printf("Cost: %v\n %s\n", p.GlobalCost(), f.Decode(p.GlobalParams()))
+	fmt.Printf(" Cost: %s\n", p.GlobalCost())
+	fmt.Printf("%s\n", f.Decode(p.GlobalParams()))
 }
 
 /*
@@ -117,6 +127,30 @@ func (a *Printheading) RunInit(man *ManPso) {
 	_, sd1 := man.FunSeed()
 	if man.RunID() == 0 || sd1 != 0 {
 		fmt.Println(man.F().About())
+		fmt.Printf("function parameter size in bits %d\n", man.F().MaxLen())
+	}
+}
+
+// RunProgress output progress statements during the run
+type RunProgress struct {
+	progress int
+}
+
+//RunInit initialises the progres counter
+func (a *RunProgress) RunInit(man *ManPso) {
+	a.progress = 0
+}
+
+//DataUpdate checks  progress and prints out a change in progress
+func (a *RunProgress) DataUpdate(man *ManPso) {
+	currentProgress := int(10 * man.Diter() / man.Datalength())
+	if currentProgress > a.progress {
+		a.progress = currentProgress
+		if a.progress < 9 {
+			fmt.Printf("%d", a.progress)
+		} else {
+			fmt.Println(a.progress)
+		}
 	}
 }
 

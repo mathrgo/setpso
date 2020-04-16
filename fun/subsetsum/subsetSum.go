@@ -30,7 +30,7 @@ type Fun struct {
 	//Seed used for generating the subset sum problems
 	Seed int64
 	//Store of CostValue
-	cost futil.CostValue
+	cost *futil.IntCostValue
 }
 
 //NewCostValue creates a zero cost value representing a
@@ -67,7 +67,7 @@ func New(nElement int, nBit int, sd int64) *Fun {
 			f.Target.Add(f.Target, f.ElementValues[j])
 		}
 	}
-	f.cost = f.NewCostValue()
+	f.cost = futil.NewIntCostValue()
 	return &f
 }
 

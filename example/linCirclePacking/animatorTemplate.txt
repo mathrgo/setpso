@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+
+<body>
+
+    <p><button onclick="myMove()"> animate global best</button></p>
+
+    <canvas id="circleCanvas" width="{{.DispSize}}" height="{{.DispSize}}" style="border: 1px solid #000000;">Your browser does not support canvas</canvas>
+
+
+    <script>
+        
+
+        function myMove() {
+
+
+            var elem = document.getElementById("circleCanvas");
+            var grx = elem.getContext("2d");
+            var cx = elem.width / 2;
+            var cy = elem.height / 2;
+            var r = cx
+
+
+            function drawCircle(x, y, r) {
+                grx.beginPath();
+                grx.arc(x, y, r, 0, 2 * Math.PI);
+                grx.stroke();
+            }
+
+            var idx = 0;
+            var id = setInterval(frame, 40);
+            grx.lineWidth = 2;
+
+
+            function frame() {
+                if (idx >= circles.length) {
+                    grx.strokeStyle = '#dd0000';
+                    drawCircle(cx, cy, r - 2);
+                    clearInterval(id);
+                } else {
+                    grx.clearRect(0, 0, elem.width, elem.height)
+                    grx.strokeStyle = '#000099';
+                    drawCircle(cx, cy, r);
+
+                    grx.strokeStyle = '#dd0000';
+                    var x = circles[idx];
+                    while (x > 0) {
+
+                        idx++;
+                        var y = circles[idx];
+                        idx++;
+                        var r1 = circles[idx];
+                        drawCircle(x, y, r1);
+                        idx++;
+                        x = circles[idx];
+                    }
+                    idx++;
+                }
+            }
+
+        }
+        var circles = [
+            {{.CircleData}}
+        ]
+    </script>
+
+</body>
