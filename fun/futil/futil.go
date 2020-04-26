@@ -355,7 +355,7 @@ func (c *SFloatCostValue) Update(x interface{}) {
 	l0 := c.lambda
 	c.mean = l1*c.mean + l0*c1.mean
 	c.isum = l1*c.isum + l0*c1.mean*c1.mean
-	if dl := c.delta * c.bMem * c.bMem; dl < 1.0 {
+	if dl := c.delta * l0 * l0; dl < 1.0 {
 		c.variance = (c.isum - c.mean*c.mean) * dl / (1.0 - dl)
 	}
 
@@ -366,17 +366,22 @@ func (c *SFloatCostValue) Cmp(x interface{}) int {
 	c1 := x.(*SFloatCostValue)
 	d := c.mean - c1.mean
 
-	thr := c.thres2 * c.variance
-	thr1 := c1.thres2 * c1.variance
-	if d*d < thr+thr1 {
-		if c.lambda <= c.minLambda && c1.lambda <= c1.minLambda {
-			return 0
-		} else if thr < thr1 {
-			return -2
-		} else {
+	thr := c.thres2 * (c.variance + c1.variance)
+
+	if d*d < thr {
+		if c.lambda > c.minLambda {
+			if c1.lambda > c.minLambda {
+				if c.variance < c1.variance {
+					return 2
+				}
+				return -2
+			}
 			return 2
 		}
-
+		if c1.lambda > c.minLambda {
+			return 2
+		}
+		return 0
 	}
 
 	if d > 0 {
