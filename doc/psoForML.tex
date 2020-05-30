@@ -14,7 +14,7 @@
 \numberwithin{figure}{section}
 
 %\makeatother
-
+\newcommand{\codesorc}[1]{\texttt{github.com/mathrgo/setpso/#1}}
 \usepackage{babel}
 \begin{document}
 	\title{Experiments in Developing Discrete Particle Swarm Optimisers}
@@ -39,12 +39,14 @@ p_t^i& \mathrm{if}\; x_{t+1}^i\notin \varOmega \;\mathrm{or}\; F(p_t^i)<F(x_{t+1
 x_t^i&\mathrm{otherwise} 
 \end{array}\right. 
 \end{align} 
-where $F(x)$ is the cost of the state $x$; $N_t^i$ is the  collection of personal best states used by the $i$th particle to update its velocity from iteration $t$ to $t+1$: $\varOmega$ is a feasible  subset of states usually characterised as satisfying a collection of constraints . 
+where $F(x)$ is the cost of the state $x$; $N_t^i$ is the  collection of particles who's  personal best states are targeted by the $i$th particle to update its velocity from iteration $t$ to $t+1$ and  $ i \in N_t^i $; $\varOmega$ is a feasible  subset of states usually characterised as satisfying a collection of constraints . 
 
-The PSO has several variants and the above description is a general summery where for continuous parameters the state is a $d$ dimensional vector space of real numbers $\mathbb{R}^d$. Typically the velocity is made up from random multiples of the vector diference between $x_t^i$ personal bests and members of$N_t^i$ giving the swarms directions to go to look for improved $F(x)$ values. Also $\mu$ and $\xi$ are not true functions since they depend on hidden random variables that are crucial for ensuring the ability to find a low cost near optimal personal best after sufficient iteration, but are otherwise processes that depend on the variables given as their arguments.
+The PSO has several variants and the above description is a general summery where for continuous parameters the state is a $d$ dimensional vector space of real numbers $\mathbb{R}^d$. Typically the velocity is made up from random multiples of the vector difference between $x_t^i$ and personal best of members of $N_t^i$ giving the swarms directions to go to look for improved $F(x)$ values. Also $\mu$ and $\xi$ are not true functions since they depend on hidden random variables that are crucial for ensuring the ability to find a low cost near optimal personal best after sufficient iteration, but are otherwise processes that depend on the variables given as their arguments and personal best of members in $N_t^i$ .
  
 \subsection{The direction of Interest}
 The main interest is developing an optimiser for Machine Learning that bridges the gap between neural nets and more structure determining optimisers such as genetic algorithms. To do this the current work looks at combinatorial optimisation problems (COP) using discrete tuning parameters in the form of binary strings (BS) for particle state with a range of cost-function value types. Such  a PSO will be called a Set PSO ( abbreviated to SPSO) to emphasise that it interprets BS as  sub sets to represent the parameters of SPSO. 
+
+the binary representation can be regarded as an encoding of algorithms or anything representable in a computer. For instance, by reinterpreting the string as an encoding of a vector value the SPSO can be used to deal with  ( possibly low precision ) continuous vector states as will be shown later on. It is hoped that the SPSO is powerful enough to be used as a general optimiser in this sense without knowing how the cost function is constructed. The idea is that because of its general nature it may take a lot of iterations to find a useful optimisation so general solutions in the form of learnt programs will need to be fed back into a list of things to try and thus accelerate finding optimisation of related cost functions using this bootstrap approach. Each solution with parameters could be encoded using a short binary string. How this is to be done in detail is intended to be part of SPSO use to be explored here.
 
 \subsection{Machine Learning Extensions }
 For  Machine Learning there is a need to extend the basic SPSO to cope with:
@@ -58,34 +60,6 @@ For  Machine Learning there is a need to extend the basic SPSO to cope with:
 The SPSO is developed mainly through biased intuitive analogy with  other systems. As such it needs a programming language to explore empirically its properties and implement it. The language chosen is Golang. The treatment of SPSO here attempts to make the description language agnostic, however sometimes golang constructs such as interface are directly used to simplify the description of algorithms and help the user understand what the code is trying to do.     
 
 \section{Set PSO}
-\subsection{Cost-function Value Representation}   
-COP problems are discrete in nature and often have an integer cost-function value, because of this big integer cost values was initially used for SPSO.  The restriction to big integer is strictly not required since the cost function is used only to compare the cost between solutions so the cost function value in the software is represented by the interface type \texttt{CostValue}. This has the additional advantage that it can contain state to help deal with noisy data that needs to be evaluated several times to reduce the noise and store its variance.
-
-Formaly \texttt{CostValue} object \texttt{cost} has the following interface methods were \texttt{x} is to be kept general to avoid a circular definition, but is expected to  have a type that can be converted to the cost value object being used; In this case \texttt{x} is a raw cost issued by the cost function  :
-\begin{list}{}
-	\item \texttt{cost.Set(x interface\{\})} this sets the object to a copy of the value \texttt{x}. 
-	\item \texttt{cost.Update(x interface\{\})} this combines \texttt{x} with the internal state stored by \texttt{cost} usualy to generate a cost with reduced variance to aid comparison with other costs.
-	\item \texttt{cost.Cmp(x interface\{\}) int} this compares the cost value object with x and returns the following values:
-		\begin{list}{}
-		\item $-2$ \texttt{cost} needs to be further evaluated to establish a comparison.
-		\item $-1$ \texttt{cost} has a lower cost than \texttt{x}.
-		\item $\quad 0$ \texttt{cost} has the same cost value as \texttt{x}.
-		\item $\quad 1$ \texttt{cost} has a larger cost vale than \texttt{x}.
-		\item $\quad 2$ \texttt{x} needs to be further evaluated to establish a comparison.
-		\end{list}
-	
-	\item \texttt{cost.Fbits() float64} this returns a logarithmic like floating point value for plotting; it attempts to give the number of bits  used in the big integer case for positive integer. A zero cost returns $0$. To illustrate, this function for continuous deterministic  case  would be:
-	\[ Fbits=\mathrm{sign}(cost)\log_2(1+|cost|)   \]
-
-\end{list}
-As can be seen the underlying implementation of the cost value is well hidden from SPSO by using this interface it allows the cost-function to have a range of implementations  of its cost value which could include big integers, floating point, or even strings representing programs! 
-
-Here we talk about a cost value as if it has a numerical value; this may not be  the case it could for instance be a program to implement changes to reach a goal; in this case  \texttt{Fbits()} just gives an indication of the complexity of the changes while \texttt{Comp()} does the comparison between solutions. 
-
-\texttt{Comp()} has two additional values $\pm2$ which are used in cases where the cost value is difficult to compare without further evaluation due to randomness in the costs being evaluated. behind the scenes the cost value could for instance have a measured mean and variance associated to the cost value. If there is too much variance associated with a solution pair there cannot be a meaningful comparison between them and further cases are needed to reduce the variance through more cost-function evaluation.  
-
-Big integer cost values are used to include some of the difficult cases in combinatorial optimisation, although the chance of finding global best solutions to these problems is minimal; however, The algorithms are expected to produce good useful approximations to these hard problems; I would like to suggest that main area of application is \emph{machine learning where one is interested in good approximate minimisation solutions of difficult problems}.
-
 
 \subsection{The Importance of Satisfying Constraint on Solutions }
 COP problems such as the Travelling Sales Person(TSP) have constraints defining $\varOmega$ that must be satisfied if to be of any use so one must continuously ensure the candidate solution is in $\varOmega$ before evaluating its cost. Often feasible points $\varOmega$ do not form an open subset of the space of states so a raw update of $x_t^i$ will not give a feasible state most of the time. To cope with this $\xi$ computes a raw update $\breve{x}_{t+1}^i$ which it then attempts to  convert into a feasible one before being returned as a update. Sometimes this may not be possible and the returned $x_t^i$ is not in $\varOmega$. As indicated in the update equation this results in no change to the personal best thus ensuring that personal bests are updated to only feasible states.   To acheive a working alternative  in $\varOmega$ the  cost function does this. 
@@ -189,11 +163,16 @@ x_t^i&\mathrm{otherwise}
 \end{align} 
 this gives an update that satisfies the constraints, $\Omega$ where  the initalisation of the state $x_0^i$ is chosen to ensure it also satisfies the constraint. this is done by random selection until the application of  \texttt{ToConstraint()} gives something that satisfies the constraint. Note during this operation the first argument will be the empty set and should be treated as a special case by the cost function.
 
-\subsection{Updating the personal best}
-To cope with noisy cost-functions the comparator function Comp() has the option of not being able to compare two  cases but will indicate which case needs to be further evaluated to improve the chance of a successful  comparison. let $x$  and $y$ be two constraint satisfying subset cases from this we get the cost function values $F(x)$ and $F(y)$ we now attempt a comparison say by using Comp() method on $F(x)$ and we use the  following symbolic notation depending on the result as follows:
+\subsection{grouping Swarm Particles } 
+It is anticipated  that the main things that improve the SPSO performance is change in heuristics and the method used to choose the target sets $N_t^i$. Further more it is expected that particles in the swarm will adopt specialist behaviour by belonging to a group of particles. To support this the swarm is  partitioned into groups where each group of swarm particles has the same set of targets and heuristics. Groups are each given a name to aid describing a group. To begin with there is one group called "root" which contains all particles. Heuristics are often the same between groups so when forming a new group the heuristics are linked to the "root" group, although this can be modified and in general groups share heuristics to simplify changing a heuristic. Groups are populated by moving swarm particles from other groups thus maintaining a partition of swarm. By default the heuristics are chosen to have useful values and need not be explicitly given.              
+
+\subsection{Updating the personal best comparison}
+The cost function $F$ generates a cost value $F(x)$ for subset $x$, which have Golang interface \texttt{CostValue} given in Section \ref{Sec:CostValue}. At each Iteration $F(p^i_t)$ for the personal best is updated to allow for possible change in $F$ : the personal best is compared with $\breve{x}_{t+1}^i$ by using $F(\breve{x}_{t+1}^i).\mathtt{Cmp}(F(p^i_t))$ to start the comparison with smallest value used as a the personal best. Following this the global best among the personal best is recorded for monitoring.
+
+To cope with noisy cost-functions the comparator function $F(x).\mathtt{Cmp()}$ has the option of not being able to compare two  cases but will indicate which case needs to be further evaluated to improve the chance of a successful  comparison. let $x$  and $y$ be two constraint satisfying subset cases from this we get the cost function values $F(x)$ and $F(y)$ we now attempt a comparison say by using \texttt{Cmp()} method on $F(x)$ and we use the  following symbolic notation depending on the result as follows:
 
 \begin{tabular}{|c|c|c|}\hline
-$F(x).\mathtt{Comp}(F(y))$ & Operator& Comment\\
+$F(x).\mathtt{Cmp}(F(y))$ & Operator& Comment\\
 \hline \hline 
 0& $F(x)=F(y)$& \\
 -1& $F(x)<F(y)$ &\\
@@ -203,29 +182,175 @@ $F(x).\mathtt{Comp}(F(y))$ & Operator& Comment\\
 \hline	
 	
 \end{tabular}\newline
-To get a comparison of costs between two subset cases $x$ and $y$  the optimiser  calls the cost function again when it needs  further evaluation and updates the cost  value with the new raw  value  from the cost function until there is enough drop in variance to do the comparison the \texttt{CostValue} is designed to ensure  that the costs are deemed equal if the variances cannot be reduced enough to discriminate between $F(x)$ and $F(y)$ so the comparison process is finite.
+To get a comparison of costs between two subset cases $x$ and $y$  the optimiser  calls the cost function again when it needs  further evaluation and updates the cost  value with the new raw  value  from the cost function until there is enough drop in uncertainty to do the comparison. The cost value is designed to ensure  that the costs are deemed equal if the uncertainty cannot be reduced enough to discriminate between $F(x)$ and $F(y)$  so the comparison process is finite. 
+
+This sharing of evaluation between cost function and SPSO seemed to be a good thing at the time it was invented making the SPSO actively choose what to do next and calling the cost function for further clarification in the form of updates thus making the $F(x)$ a more passive administrative object as a value should be. This keeps the door open for the optimiser to defer additional evaluations if the cost function evaluation is expensive and there is an alternative comparison at hand that is better. However, the cost value object could be more active and do its own calls to the cost function thus avoiding the $F(x)\leftthreetimes F(y)$ and  $F(x)\rightthreetimes F(y)$ cases as far as the SPSO is concerned.
+
+\section{Cost-function Value Representation} \label{Sec:CostValue}  
+COP problems are discrete in nature and often have an integer cost-function value, because of this big integer cost values was initially used for SPSO. Since then the cost value has been extended to be more than this and acts as a golang interface between the cost function and the SPSO with possibly its own internal state. this interface is called  \texttt{CostValue}. It is now up to the cost function to choose which implementation of this interface to use. After describing the interface seen by SPSO several examples will be given. For golang code see \codesorc{fun/futil/futil.go}
+
+Formaly \texttt{CostValue} object \texttt{cost} has the following golang interface methods were \texttt{x} is to be kept general to avoid a circular definition, but is expected to  have a type that can be converted to the cost value object being used; In this case \texttt{x} is a raw cost issued by the cost function or \texttt{CostValue} that has been updated :
+\begin{list}{}
+	\item \texttt{cost.Set(x interface\{\})} this sets the object to a copy of the value \texttt{x}. If the  value is a raw value provided internally by the cost function the internal state of the value is initialised.
+	\item \texttt{cost.Update(x interface\{\})} this combines \texttt{x} with the internal state stored by \texttt{cost} usualy to generate a cost with reduced uncertainty to aid comparison with other costs.
+	\item \texttt{cost.Cmp(x interface\{\}) int} this compares the cost value object with x and returns the following values:
+	\begin{list}{}
+		\item $-2$ \texttt{cost} needs to be further evaluated to establish a comparison.
+		\item $-1$ \texttt{cost} has a lower cost than \texttt{x}.
+		\item $\quad 0$ \texttt{cost} has the same cost value as \texttt{x}.
+		\item $\quad 1$ \texttt{cost} has a larger cost vale than \texttt{x}.
+		\item $\quad 2$ \texttt{x} needs to be further evaluated to establish a comparison.
+	\end{list}
+	
+	\item \texttt{cost.Fbits() float64} this returns a logarithmic like floating point value for plotting; it attempts to give the number of bits  used in the big integer case for positive integer. A zero cost returns $0$. To illustrate, this function for continuous deterministic  case  would be:
+	\[ Fbits=\mathrm{sign}(cost)\log_2(1+|cost|)   \]
+	\item \texttt{cost.String() string} gives a human readable description of the  interface state.
+	
+\end{list}
+As can be seen the underlying implementation of the cost value is well hidden from SPSO by using this interface it allows the cost-function to have a range of implementations  of its cost value which could include big integers, floating point, or even strings representing programs! 
+
+Here we talk about a cost value as if it has a numerical value; this may not be  the case it could for instance be a program to implement changes to reach a goal; in this case  \texttt{Fbits()} just gives an indication of the complexity of the changes while \texttt{Comp()} does the comparison between solutions. 
+
+\texttt{Comp()} has two additional values $\pm2$ which are used in cases where the cost value is difficult to compare without further evaluation due to randomness in the costs being evaluated. behind the scenes the cost value could for instance have a measured mean and variance associated to the cost value. If there is too much variance associated with a solution pair there cannot be a meaningful comparison between them and further raw  evaluations by the cost function is needed  to reduce the variance.  
+
+Big integer cost values are used to include some of the difficult cases in combinatorial optimisation, although the chance of finding global best solutions to these problems is minimal; however, The algorithms are expected to produce good useful approximations to these hard problems; I would like to suggest that main area of application is \emph{machine learning where one is interested in good approximate minimisation solutions of difficult problems}.
 
 
 
-\subsection{grouping Swarm Particles } 
-It is anticipated  that the main things that improve the SPSO performance is change in heuristics and the method used to choose the target sets $N_t^i$. Further more it is expected that particles in the swarm will adopt specialist behaviour by belonging to a group of particles. To support this the swarm is  partitioned into groups where each group of swarm particles has the same set of targets and heuristics. Groups are each given a name to aid describing a group.To begin with there is one group called "root" which contains all particles. Heuristics are often the same between groups so when forming a new group the heuristics are linked to the "root" group, although this can be modified and in general groups share heuristics to simplify changing a heuristic. Groups are populated by moving swarm particles from other groups thus maintaining a partition of swarm. By default the heuristics are chosen to have useful values and need not be explicitly given.              
-  	
-\section{How to deal with a noisy cost function?}
 
-In the targeted application of Machine Learning the cost-function $F(x)$ is not a direct mathematical function of $x$ and has a random component so it has to be evaluated several times before comparing the fitness of $x$. 
+\subsection{\texttt{SFloatCostValue} implementaation of \texttt{CostValue}}
 
-The Particle Swarm Optimiser uses a personal best and global best
-set of parameters and costs to guide it in its optimisation. in the
-standard implementation this assumes that the cost function is deterministic
-to the extent that the cost is assumed to be a direct function of
-the parameters submitted to the cost function. However, this may not
-be the case when dealing with real data where there are hidden parameters
-that are not accounted for or the cost is a random function parametrised
-by $x$. This means that the personal best may be due
-to parameters with a fluke low cost which is rearly improved on during
-the optimisation and thus cause the process to stick at a non optimal
-value for typical behaviour. Furthermore the underlying statistics
-may be slowly changing as the cost is sampled. 
+In the targeted application of Machine Learning the cost-function  value $F(x)$ is not a direct mathematical function of $x$ and has a random component so it has to be evaluated several times before comparing the fitness of $x$. \texttt{SFloatCostValue}  is used in this case if the underlying mean value is the cost to minimise.  Even if the  cost function is deterministic, The evaluation of a cost value may include a very large number of tests to evaluate  the cost. for instance the cost may be a measure of a program output miss match for all possible inputs. faced with this a small set of randomly selected test cases is used instead. Each time there is a need to calculate another value a fresh set of random samples is used to generate another approximate cost. To keep things simple assume that each cost sample is independent for a given $x$ and that the statistics of $F(x)$ for a given $x$ is slowly varying with a time constant of at least $T_C$. The idea is that  \texttt{SFloatCostValue}  maintains a mean and variance running value subject to the time constant constraint. 
+
+Let $x,y $   be two parameters  for comparison that has the corresponding estimated mean $C_x,C_y $and estimated  variance $\sigma^2C_x, \sigma^2C_y$ of these respective means .  The noisy raw cost signal is replaced by the mean estimates for comparison. Put
+\[ \Delta=(C_x-C_y)^2 -(\sigma_{thres})^2(\sigma^2C_x+\sigma^2C_y) \]
+the difference is regarded as significant if 
+\[  \Delta>0\]
+for some comparison threshold $\sigma_{thres} $ used as a heuristic.\footnote{ normally $ \sigma_{thres}$ is independent of the cost value but in the code is stored by $F(x)$; in the code $x,y$ is used as in $F(x).Cmp(F(y) $ so there is a slight lack of symmetry in the treatment of $(x,y)$  } As more measurements are included the variance of estimates reduces. As will be shown the time constant constraint stops this variance reduction beyond a certain point at which  the  variance is time constant limited. We get the following cases:
+\begin{list}{}
+	\item $F(x)<F(y)$  when $\Delta >0$ and $C_x<C_y$
+	\item $F(x)>F(y)$  when $\Delta >0$ and $C_x>C_y$	
+	\item $F(x) \leftthreetimes F(y)$  when $\Delta \le 0$  and $\sigma ^2C_x>sigma^2C_y$ with $\sigma ^2C_x,\sigma ^2C_y$ not time constant limited.
+	\item $F(x) \leftthreetimes F(y)$  when $\Delta \le 0$  and $\sigma ^2C_y$ is time constant limited but $\sigma ^2C_x$ is not.
+	\item $F(x) \rightthreetimes F(y)$   when $\Delta \le 0$  and $\sigma ^2C_x \le \sigma^2C_y$ with $\sigma ^2C_x,\sigma ^2C_y$ not time constant limited.
+	\item $F(x) \rightthreetimes F(y)$ when $\Delta \le 0$  and $\sigma ^2C_x$ is time constant limited but $\sigma ^2C_y$ is not.
+	\item $F(x)=F(y)$    for all other cases.			
+\end{list} 
+The idea is to carry on asking for cost function updates until the difference in the estimated means are significant, always asking for further evaluations that are likely to achieve this and failing this regard the  cost values to be effectively equal. 
+
+\subsubsection{ evaluating running mean and its variance}
+This leads to how the $C$ and $\sigma ^2C$ are evaluated. Let $(x_0, \ldots, x_ j \dots )$ be a sequence of raw cost values produced by the cost function for a  parameter $x$ then intuitively an estimate of the mean $C_j$ minimises
+\begin{equation}\label{eq:J_j}
+J_j=\frac{1}{2}\sum_{i=0}^{i=j}\alpha_{j\:i}(x_i-C_j)^2
+\end{equation}
+where the $\alpha_{j\:i}$ are chosen to be of the form 
+\begin{equation}\label{eq:alpha_def}
+\alpha_{j\:i}=\prod_{k=i+1}^{j}b_k\: \mathrm{for}\: j>i ;\; \alpha_{j\:j}=1
+\end{equation}
+The $b_k$ can be regarded as forgetting weights and for the moment has a value between 0 and 1. the form of $\alpha_{j\:i}$  has been chosen to give incremental updates. Choose $C_j$ to minimise $J_j$ so the derivative with respect to $C_j$ will be zero giving
+\begin{equation}\label{eq:J_zero_diff}
+0=\dfrac{\partial J_j}{\partial C_j} =-\sum_{i=0}^j (x_i-C_j)\alpha_{j\:i}
+\end{equation}
+which gives
+\begin{equation}\label{eq:C_j_def}
+ C_j= D_j \lambda_j
+\end{equation}
+where
+\begin{align}
+D_j =&\sum_{i=0}^j x_i \alpha_{j\:i}\label{eq:D_j_def} \\
+\lambda_j=\beta_j^{-1};\:\beta_j=&\sum_{i=0}^j \alpha_{j\:i}\label{ eq:lambda_j_def}
+\end{align}
+Later on we will need
+\begin{align}\label{delta_j_def}
+\delta_j=&\sum_{i=0}^j \alpha_{j\:i}^2\\
+I_j=&\lambda_j \sum_{i=0}^j \alpha_{j\:i} x_i^2
+\end{align} 
+using \ref{eq:alpha_def} we get the following iterative evaluations for $j > i\geq 0$
+\begin{align}
+\alpha_{j\:i}=&b_j \alpha_{j-1\:i}\\
+\beta_j=&b_j \beta_{j-1} + 1;\:\beta_0=1 \label{eq:beta_j_iter}\\
+\lambda_j=&\frac{\lambda_{j-1}}{\lambda_{j-1} + b_j} ; \: \lambda_0=1  \label{eq:lambda_iter}\\
+D_j=&b_j D_{j-1} + x_j ; \: D_0=x_0\\
+\delta_j=& b_j^2 \delta_{j-1}+1 \label{eq:delta_iter}
+\end{align}
+from this we get an iteration rule for $C_j$
+\begin{align}
+C_j=&(b_j D_{j-1} + x_j)\lambda_j \\
+=& \frac{b_j D_{j-1} \lambda_j}{\lambda_j +b_j} +x_j \lambda_j \\
+=&(1-\lambda_j)C_{j-1} + x_j \lambda_j : \: C_0=x_0 \label{eq:c_j_iter}
+\end{align}
+Similarly we get the iteration
+\begin{align}
+I_j=& (1-\lambda_j)I_{j-1}+\lambda_j x_j^2; \: I_0=x_0^2
+\end{align}
+To get a handle on the statistics assume that it is effectively constant with the samples of $x_j$ being independent with mean $\mu$ and variance $\sigma^2 $ then taking expected values we get
+\begin{align}
+\mathbb{E}(C_j)=& (1-\lambda_j)\mathbb{E}(C_{j-1})+\mathbb{E}(x_j)\lambda_j\\
+=& (1-\lambda_j)\mu +\lambda_j \mu\\
+=&\mu
+\end{align}
+by induction, so $C_j$ is an unbiased estimate of the mean as expected. 
+To calculate the variance of $C_j$ first calculate
+\begin{align}
+\mathbb{E}(C_j^2)=& \lambda_j ^2  \mathbb{E}\{ (\sum_{i=0}^{j} x_i \alpha_{j\:i} )  (\sum_{k=0}^{j} x_k \alpha_{j\:k} )\}\\
+=&\lambda_j ^2  \{\sum_{i=0}^j \mathbb{E}(x_i^2)\alpha_{j\:i}+\sum_{i \ne k} \mathbb{E}(x_i)\alpha_{j\:i}\mathbb{E}(x_k)\alpha_{j\:k}\}\\
+=&\lambda_j ^2  \{  (\sigma^2+\mu^2)\delta_j +\mu^2 \beta_j^2 -\mu^2 \delta_j  \}\\
+=&\sigma^2 \delta_j  \lambda_j ^2 + /mu^2
+\end{align}
+so the variance of $C_j$ is given by
+\begin{equation}\label{eq:C_j_variance}
+\sigma^2 C_j = \sigma^2 \delta_j  \lambda_j ^2 
+\end{equation}
+Now
+\begin{align}
+\mathbb{E}(I_j)=&\lambda_j \sum_{i=0}^j \alpha_{j\:i} \mathbb{E}()x_i^2)\\
+=&\lambda_j \beta_j (\sigma^2 +\mu^2)\\
+=& \sigma^2 +\mu^2
+\end{align}
+from this we get for
+\begin{align}\label{key}
+\gamma_j=& \frac{\delta_j \lambda_j^2}{1-\delta_j \lambda_j^2}\\
+K_j =& \gamma_j(I_j-C_j^2)\\
+\mathbb{E}(K_j)=&\gamma_j \{ \mathbb{E}(I_j)- \mathbb{E}(C_j^2)  \} \\
+=& \gamma_j \{ \sigma^2 +\mu^2 -  \sigma^2 \delta_j  \lambda_j ^2 -\mu^2  \}\\
+=&  \frac{\delta_j \lambda_j^2}{1-\delta_j \lambda_j^2} (1-\delta_j \lambda_j^2)\sigma^2\\
+=&  \sigma^2 \delta_j  \lambda_j ^2 
+\end{align}
+so  $K_j$ is an unbiased estimate of $ \sigma^2 C_j  $, so we can use $C_j$ as the running estimate of  mean and $K_j$ as  estimate of $C_j$ variance.
+\subsubsection{choosing values for $b_j$}
+Alll that remains is to choose  the $b_j$ which is limited to be in the range $[0, 1]$.  by Equations \ref{eq:C_j_variance}, \ref{eq:delta_iter}, \ref{eq:delta_iter} we can see that 
+\begin{align}
+\frac{\partial \sigma^2 C_j}{\partial b_j}=& \frac{\partial}{\partial b_j} \left[\sigma^2\frac{\lambda_{j-1}^2(b_j^2 \delta_{j-1}+1) }{(\lambda_{j-1}+b_j )^2} \right]\\
+=&-2\sigma^2\lambda_{j-1}^2\frac{\delta_j b_j^2 +1  -b_j \delta_{j-1}(\lambda_{j-1}+b_j)}{(\lambda_{j-1} + b_j)^3} \\
+=& -2\sigma^2\lambda_{j-1}^2\frac{(1  -b_j \delta_{j-1}\lambda_{j-1})}{(\lambda_{j-1} + b_j)^3} \label{ eq:C_var_b_slope   } \\
+\end{align}
+Now by using the restricted range for $b_j$ and Equations \ref{ eq:lambda_j_def}, \ref{eq:beta_j_iter}, \ref{eq:beta_j_iter} and the fact that $b_j^2\le b_j$ we get by induction that
+\begin{equation}
+0 \le b_j \lambda_j \delta_j \le 1
+\end{equation}
+so pluging this into Equation \ref{ eq:C_var_b_slope   } gives 
+\begin{equation}
+\frac{\partial \sigma^2 C_j}{\partial b_j} \le 0
+\end{equation}
+so the largest $b_j$ gives the best decrease in the variance of  $C_j$. also if we put $b_j = 0$ we get no change in the variance  from the previous variance so we also have
+\begin{equation}
+sigma^2 C_j\le sigma^2 C_{j-1}
+\end{equation}
+as well as this we get a decrease in $\lambda+j$ at each stage. However, if  $\lambda_j$ gets too small  the estimates start to ignore any changes in the statistics so we need to restrict $\lambda_j$ to ensure it has a time constant of not more than $T_C $ this means that
+\begin{align}
+1-\lambda_j \le e^{-1/T_C}
+\end{align}  
+since  the timse constant is large we can use the approximation 
+\begin{equation}
+\lambda_j \ge 1/T_C
+\end{equation}
+So to get the best reduction of  $\sigma^2 C_j$ we keep $b_j = 1$ until  $\lambda_j$ hits the time constant limit and set
+\begin{align}
+\lambda_j =& 1/T_C \\
+b_j =& 1-\lambda_j
+\end{align}
+ to stop any further reduction in the time constant of the iterative update.
+ 
 \part{Miscellaneous Ideas}
 \chapter{Statistics}
 \section{Recursive formula for calculating expected values}

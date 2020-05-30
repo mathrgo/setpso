@@ -11,8 +11,8 @@ import (
 	"fmt"
 
 	"math/rand"
-
 	"github.com/mathrgo/setpso/fun/dag"
+	"github.com/mathrgo/setpso/fun/parity"
 	"github.com/mathrgo/setpso/psokit"
 )
 
@@ -20,7 +20,7 @@ type parityFun1 struct {
 }
 
 func (fc *parityFun1) Create(fsd int64) psokit.Fun {
-	s := dag.NewParitySampler(5)
+	s := parity.NewSampler(5)
 	opt := dag.NewOpt4Bool()
 	nnode := 6
 	nbitslookback := 3

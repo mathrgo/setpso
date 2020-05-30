@@ -41,3 +41,16 @@ func ExampleSplitter_Join() {
 	/* Output:
 	 */
 }
+
+func ExampleNewSFloatCostValue() {
+	Tc := 100.0
+	sigmaThres := 2.0
+	//c1 := NewSFloatCostValue(Tc, sigmaThres)
+	c := NewSFloatCostValue(Tc, sigmaThres)
+	c.Set(10.0)
+	//c1.Set(15.0)
+	//c.Update(c1)
+	fmt.Printf("c = %v fbits=%f", c, c.Fbits())
+	/* Output:
+	 */
+}

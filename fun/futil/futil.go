@@ -293,8 +293,6 @@ func (c *FloatCostValue) String() string {
   updating weight that incorporates a forgetting process that allows for
   gradual change to the cost function itself. */
 type SFloatCostValue struct {
-	//indicates wether variance is  calculated
-	calcVariance bool
 	//treshold used in comparing values
 	thres2 float64
 	// mean as smoothed value
@@ -311,21 +309,30 @@ type SFloatCostValue struct {
 	delta float64
 	// weighted sum of squares used to calculate variance of mean
 	isum float64
+	// Time constant
+	Tc float64
+	// sigma threshold factor
+	sigmaThres float64
 }
 
 // NewSFloatCostValue returns a pointer to SFloatCostValue type initialised
 // with a  time constant to stats change of Tc. sigma Thres gives the number of sigmas needed to distinguish between values.
 func NewSFloatCostValue(Tc, sigmaThres float64) *SFloatCostValue {
-	c := new(SFloatCostValue)
-	if Tc <= 0.0 {
-		c.calcVariance = false
 
-	} else {
-		c.calcVariance = true
-		c.minLambda = 1.0 / Tc
-		c.thres2 = sigmaThres * sigmaThres
-	}
+	c := new(SFloatCostValue)
+	c.Tc = Tc
+	c.sigmaThres = sigmaThres
+	c.minLambda = 1.0 / Tc
+	c.thres2 = sigmaThres * sigmaThres
+	
+
 	return c
+}
+
+//String gives human readable description
+func (c *SFloatCostValue) String() string {
+	return fmt.Sprintf("mean=%f variance=%f\n  TC=%f  threshold =%f ",
+		c.mean, c.variance, c.Tc, c.sigmaThres)
 }
 
 //Set is used to set c from x
@@ -334,16 +341,22 @@ func (c *SFloatCostValue) Set(x interface{}) {
 		*c = *c1
 	} else if c2, v := x.(float64); v {
 		c.mean = c2
-		c.variance = 0.0 // play safe
+		c.variance = math.Inf(1) // play safe
 		c.bMem = 1.0
 		c.lambda = 1.0
 		c.delta = 1.0
 		c.isum = c2 * c2
+	} else {
+		panic("could not set cost value\n")
 	}
 }
 
 //Update adds the mean of x as raw data to calculate an updated stats of the cost value
 func (c *SFloatCostValue) Update(x interface{}) {
+	if c.variance <= 0.0 {
+		c.Set(x)
+		return
+	}
 	c.lambda = c.lambda / (c.lambda + c.bMem)
 	if c.lambda < c.minLambda {
 		c.lambda = c.minLambda
@@ -376,9 +389,9 @@ func (c *SFloatCostValue) Cmp(x interface{}) int {
 				}
 				return -2
 			}
-			return 2
-		}
-		if c1.lambda > c.minLambda {
+			return -2
+
+		} else if c1.lambda > c.minLambda {
 			return 2
 		}
 		return 0
@@ -395,8 +408,14 @@ func (c *SFloatCostValue) Cmp(x interface{}) int {
 
 // Fbits scales the cost value by taking sign(x.mean)log2(1+|x.mean|)
 func (c *SFloatCostValue) Fbits() float64 {
-	if c.mean > 0 {
-		return math.Log2(1.0 + c.mean)
+	a := math.Abs(c.mean)
+	fb := math.Log2(1.0 + a)
+	const maxValue = 10.0
+	if fb > maxValue {
+		fb = maxValue
 	}
-	return -math.Log2(1 - c.mean)
+	if c.mean > 0 {
+		return fb
+	}
+	return -fb
 }

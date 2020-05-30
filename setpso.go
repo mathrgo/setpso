@@ -252,7 +252,7 @@ func (pso *Pso) UpdateGroup(g *Group) {
 		return
 	}
 	g.bestMember = g.members[0]
-	g.bestCost.Set(pso.Pt[g.bestMember].best)
+	g.bestCost.Update(pso.Pt[g.bestMember].best)
 	for i := range g.members[1:] {
 		id := g.members[i]
 		p := &pso.Pt[id]
@@ -278,7 +278,9 @@ func (pso *Pso) UpdateGlobal() {
 	for _, g := range pso.gr {
 		if len(g.members) > 0 {
 			if pso.bestGroup != nil {
-				if g.bestCost.Cmp(pso.bestCost) < 0 {
+				compResult := pso.CleanCmp(g.bestCost,pso.bestCost,
+					pso.Pt[g.bestMember].bestParams,pso.bestParams)
+				if compResult < 0 {
 					pso.bestCost.Set(g.bestCost)
 					pso.bestGroup = g
 				}
@@ -344,33 +346,33 @@ RandomSubset converts z to a subset of z by using a probability p for
 selecting each member of z as a set. the updated z is returned using the pso
 random number generator.
 */
-func RandomSubset(z *big.Int, p float64, rnd *rand.Rand) *big.Int {
-	n := z.BitLen()
-	for i := 0; i < n; i++ {
-		if z.Bit(i) == 1 {
-			if rnd.Float64() > p {
-				z.SetBit(z, i, 0)
-			}
-		}
-	}
-	return z
-}
+// func RandomSubset(z *big.Int, p float64, rnd *rand.Rand) *big.Int {
+// 	n := z.BitLen()
+// 	for i := 0; i < n; i++ {
+// 		if z.Bit(i) == 1 {
+// 			if rnd.Float64() > p {
+// 				z.SetBit(z, i, 0)
+// 			}
+// 		}
+// 	}
+// 	return z
+// }
 
 //ToggleRandomSet takes the set z and randomly toggles in and out
 // m members out of n members and returns z.
-func ToggleRandomSet(z *big.Int, m int, n int, rnd *rand.Rand) *big.Int {
-	for i := 0; i < m; i++ {
-		j := rnd.Intn(n)
-		b := z.Bit(j)
-		if b == 0 {
-			b = 1
-		} else {
-			b = 0
-		}
-		z.SetBit(z, j, b)
-	}
-	return z
-}
+// func ToggleRandomSet(z *big.Int, m int, n int, rnd *rand.Rand) *big.Int {
+// 	for i := 0; i < m; i++ {
+// 		j := rnd.Intn(n)
+// 		b := z.Bit(j)
+// 		if b == 0 {
+// 			b = 1
+// 		} else {
+// 			b = 0
+// 		}
+// 		z.SetBit(z, j, b)
+// 	}
+// 	return z
+// }
 
 /*
 BlurTarget blurs the target set displacement based on its CardinalSize. Normally
@@ -406,6 +408,7 @@ func (pso *Pso) CleanCmp(cost1, cost2 futil.CostValue,
 			cost1.Update(pso.fun.Cost(param1))
 		}
 		compResult = cost1.Cmp(cost2)
+		//fmt.Printf("cmp =%d cost1=%v cost2=%v \n", compResult, cost1, cost2)
 	}
 	return compResult
 }
@@ -430,6 +433,7 @@ func (pso *Pso) SetParams(id int) {
 		if compResult < 0 {
 			p.best.Set(p.cost)
 			p.bestParams.Set(p.params)
+			//fmt.Printf("best cost = %v", p.best)
 		}
 	}
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"github.com/mathrgo/setpso/fun/parity"
 )
 
 func ExampleNewOpt4Bool() {
@@ -46,7 +47,7 @@ func ExampleNewDag() {
 }
 
 func ExampleNewFunBool() {
-	s := NewParitySampler(4)
+	s := parity.NewSampler(4)
 	opt := NewOpt4Bool()
 	nnode := 4
 	nbitslookback := 4
@@ -65,16 +66,4 @@ func ExampleNewFunBool() {
 	fmt.Printf("Cost: %v\n", f.Cost(z))
 	//Output:
 }
-func ExampleNewParitySampler() {
-	p := NewParitySampler(4)
-	x := big.NewInt(0)
-	y := big.NewInt(0)
-	fmt.Printf("About:\n%s\n", p.About())
-	rnd := rand.New(rand.NewSource(3142))
-	for i := 0; i < 16; i++ {
-		p.Sample(x, y, rnd)
-		fmt.Printf("%b => %b\n", x, y)
-	}
 
-	//Output:
-}
