@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"math/rand"
 
+	"github.com/mathrgo/setpso"
 	"github.com/mathrgo/setpso/fun/futil"
 )
 
@@ -23,28 +24,44 @@ type Fun struct {
 	// in the set where the ith element corresponds to the ith bit of the
 	// big integer  representing the subset
 	ElementValues []*big.Int
-	// scratch pad for calculating sums of element values
-	sum *big.Int
 	//NBit is the number of bits used to give the element values
 	NBit int
 	//Seed used for generating the subset sum problems
 	Seed int64
-	//Store of CostValue
-	cost *futil.IntCostValue
 }
 
-//NewCostValue creates a zero cost value representing a
-// big integer.
-func (f *Fun) NewCostValue() futil.CostValue {
-	return futil.NewIntCostValue()
+//Try is the try interface used by setpso
+type Try = setpso.Try
+
+//FunTry gives the try structure to use 
+type FunTry=futil.IntTry
+//TryData is the interface for FunTryData used in package futil
+type TryData= futil.TryData
+
+//FunTryData is the decoded data structure for a try
+type FunTryData struct {
+	subset *big.Int
 }
 
-// New generates a subset sum problem using n Element set elements and
+//IDecode decodes z into data
+func (f *Fun) IDecode(data TryData, z *big.Int) {
+	data.(*FunTryData).subset.Set(z)
+	//fmt.Printf("subset= %v\n",d.subset)
+}
+
+// Decode requests the try to give a meaningful interpretation of
+// z as a Parameters subset for the function assuming z satisfies constraints
+func (d *FunTryData) Decode() string {
+	return d.subset.Text(2)
+}
+//IntFunStub gives interface to setpso
+type IntFunStub = futil.IntFunStub
+
+// New generates a subset sum problem using nElement set elements and
 // nBit bits to represent the element values using the random number
 // generator seed sd , where all element values are taken to be non negative
-func New(nElement int, nBit int, sd int64) *Fun {
+func New(nElement int, nBit int, sd int64) *IntFunStub {
 	var f Fun
-	f.sum = big.NewInt(0)
 	f.Seed = sd
 	f.NBit = nBit
 	f.ElementValues = make([]*big.Int, nElement)
@@ -67,32 +84,48 @@ func New(nElement int, nBit int, sd int64) *Fun {
 			f.Target.Add(f.Target, f.ElementValues[j])
 		}
 	}
-	f.cost = futil.NewIntCostValue()
-	return &f
+
+	return futil.NewIntFunStub(&f)
 }
 
-// Cost returns the absolute value of the difference between the subset sum
-// and the target value for the sum for the subset x
-func (f *Fun) Cost(x *big.Int) futil.CostValue {
-	f.sum.SetInt64(0)
+//CreateData creates a empty structure for decoded try
+func (f *Fun)CreateData()TryData{
+t:=new(FunTryData)
+t.subset=new(big.Int)
+return t
+}
+
+// Cost calculates the cost of t as  the absolute value of the difference
+// between the subset sum and the target value for the subset try t
+func (f *Fun) Cost(data TryData, cost *big.Int) {
+	x := data.(*FunTryData).subset
+	cost.SetInt64(0)
 	for i := range f.ElementValues {
 		if x.Bit(i) == 1 {
-			f.sum.Add(f.sum, f.ElementValues[i])
+			cost.Add(cost, f.ElementValues[i])
 		}
 	}
-	f.cost.Set(f.sum.Abs(f.sum.Sub(f.sum, f.Target)))
-	return f.cost
+	cost.Abs(cost.Sub(cost, f.Target))
+}
+
+//DefaultParam gives a default that satisfies constraints
+func (f *Fun)DefaultParam() *big.Int{
+	return new(big.Int)
+}
+
+//CopyData copies src to dest
+func (f *Fun)CopyData(dest,src TryData){
+	s:=src.(*FunTryData)
+	d:=dest.(*FunTryData)
+d.subset.Set(s.subset)
 }
 
 // MaxLen returns the number of elements in the subset sum problem
 func (f *Fun) MaxLen() int {
 	return len(f.ElementValues)
 }
-
-// ToConstraint uses the previous parameter pre and the updating hint parameter
-// to attempt to produce an update to hint which satisfies solution constraints
-// and returns valid = True if succeeds
-func (f *Fun) ToConstraint(pre, hint *big.Int) (valid bool) {
+//Constraint attempts to constrain hint possibly using a copy of pre to do this
+func (f *Fun) Constraint(pre TryData, hint *big.Int) (valid bool) {
 	valid = true
 	return
 }
@@ -113,12 +146,6 @@ func (f *Fun) About() string {
 	}
 
 	return s
-}
-
-// Decode requests the function to give a meaningful interpretation of
-// z as a Parameters subset for the function assuming z satisfies constraints
-func (f *Fun) Decode(z *big.Int) (s string) {
-	return z.Text(2)
 }
 
 // Delete hints to the function to remove/replace the ith item

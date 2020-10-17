@@ -18,7 +18,7 @@ type OptFloat interface {
 	Opt
 	// function to generate a node output l,r are the left and right inputs and opt
 	// is the encoded operation to be carried out on l,r to return the result.
-	Opt(l, r float64, opt *big.Int) float64
+	Opt(l, r float64, opt uint) float64
 }
 
 /*
@@ -66,9 +66,9 @@ func (o *Opt2Float) BitSize() int {
 // Opt is function to generate a node output. l,r are the left and right inputs
 // and opt is the encoded operation to be carried out on l,r to return the
 // result.
-func (o *Opt2Float) Opt(l, r float64, opt *big.Int) float64 {
+func (o *Opt2Float) Opt(l, r float64, opt int) float64 {
 	var f float64
-	switch opt.Int64() {
+	switch opt {
 	case 0:
 		f = l + r
 	case 1:
@@ -98,15 +98,16 @@ func (o *Opt2Float) Opt(l, r float64, opt *big.Int) float64 {
 //Int2Float gives a mapping of an indexing  integer to a float.
 type Int2Float interface {
 	// the mapping
-	Float(int) float64
-	// maximum number of bits to represent the integer
-	BitSize() int
+	Float(uint) float64
+	// maximum number of least significant bits of the integer used
+	BitSize() uint
 }
 
 //Int2FloatList uses a list of values to give the int to float index where the index is obtained taking modulus of the index length. Typicall the length of the list is a power of 2.
 type Int2FloatList struct {
-	bits int
+	bits uint
 	list []float64
+	mask uint
 }
 
 //NewInt2FloatList creates an Int2floatList from a list of values.
@@ -114,54 +115,59 @@ func NewInt2FloatList(a ...float64) *Int2FloatList {
 	f := new(Int2FloatList)
 	f.list = make([]float64, len(a))
 	copy(f.list, a)
-	f.bits = bits.Len(uint(len(a)))
+	f.bits = uint(bits.Len(uint(len(a))))
+	f.mask = 1<<f.bits - 1
 	return f
 }
 
 //BitSize gives the number of bits needed for the index.
-func (f *Int2FloatList) BitSize() int {
+func (f *Int2FloatList) BitSize() uint {
 	return f.bits
 }
 
 //Float returns the corresponding float value where the index od modded with the list length to avoid over flow.
-func (f *Int2FloatList) Float(index int) float64 {
-	return f.list[index%len(f.list)]
+func (f *Int2FloatList) Float(index uint) float64 {
+	index &= f.mask
+	return f.list[index%uint(len(f.list))]
 }
 
 //=====================================================
 
 //Int2FloatRange converts bits to a range of floats
 type Int2FloatRange struct {
-	bits        int
-	gain float64
-	begin, end  float64
+	bits       uint
+	gain       float64
+	begin, end float64
+	mask       uint
 }
 
 //NewInt2FloatRange creates an Int2floatRange  from number of bits to use  and the corresponding floating point range  .
 func NewInt2FloatRange(nbits int, begin, end float64) *Int2FloatRange {
 	f := new(Int2FloatRange)
-	f.bits = nbits
+	f.bits = uint(nbits)
 	f.begin = begin
 	f.end = end
-	f.gain = (f.end-f.begin)/float64(int(1)<<uint(nbits)) 
-
+	f.gain = (f.end - f.begin) / float64(int(1)<<uint(nbits))
+	f.mask = 1<<f.bits - 1
 
 	return f
 }
 
 //BitSize gives the number of bits needed for the index.
-func (f *Int2FloatRange) BitSize() int {
+func (f *Int2FloatRange) BitSize() uint {
 	return f.bits
 }
 
-//Float returns the corresponding float value 
-func (f *Int2FloatRange) Float(index int) float64 {
-	return f.begin+f.gain*float64(index)
+//Float returns the corresponding float value
+func (f *Int2FloatRange) Float(index uint) float64 {
+	index &= f.mask
+	return f.begin + f.gain*float64(index)
 }
+
 //===========================================
 
 /*
-OptMorphFloat encodes the Float operation  in a uniform way so the nodes can morph easily between algabraic and power law values. The operator has at first sight the strange form:
+OptMorphFloat encodes the Float operation  in a uniform way so the nodes can morph easily between algebraic and power law values. The operator has at first sight the strange form:
 	z=h(il;x)+ h(ir;y)
 operating on the pair (x,y) to give z at a node.
 the binary string representing the operation is il|ir where il and ir sub binary sequences for left and right parts of the input to the node.
@@ -170,7 +176,7 @@ the binary string representing the operation is il|ir where il and ir sub binary
 where sc,sp are 0 or 1 ;jc,jp  short non negative integers in the range 0<= jc<2^nc , 0<= jp<2^np that are mapped by the functions C and P to floating point values.
 nc,np are natural numbers giving the number of bits used to represent jc, jp. C and P are of type Int2Float.
 
-this is supprisingly expressive for instance a ratio can be expressed usig just 3 nodes.
+this is surprisingly expressive for instance a ratio can be expressed using just 3 nodes.
 
 */
 type OptMorphFloat struct {
@@ -195,7 +201,7 @@ func NewOptMorphFloat(C, P Int2Float) *OptMorphFloat {
 }
 
 // Cost gives the cost of using a node
-func (o *OptMorphFloat) Cost(opt *big.Int) int {
+func (o *OptMorphFloat) Cost(opt uint) int {
 	return 1
 }
 
@@ -206,7 +212,7 @@ func (o *OptMorphFloat) About() string {
 }
 
 // Decode gives a human readable discriptin of opt.
-func (o *OptMorphFloat) Decode(opt *big.Int) string {
+func (o *OptMorphFloat) Decode(opt uint) string {
 	o.IDecode(opt)
 	var s string
 	if o.spl {
@@ -225,76 +231,53 @@ func (o *OptMorphFloat) Decode(opt *big.Int) string {
 
 // BitSize returns Number of bits needed to store opt encoding.
 func (o *OptMorphFloat) BitSize() int {
-	return 1 + o.tC.BitSize() + o.tP.BitSize()
+	return int(2 + o.tC.BitSize() + o.tP.BitSize())*2
 }
 
-//IDecode splits the opt into its consituent parts
-func (o *OptMorphFloat) IDecode(z *big.Int) {
-	scl := z.Bit(0) > 0
-	b := 1
-	index := 0
-	for i := 0; i < o.tC.BitSize(); i++ {
-		index *= 2
-		if z.Bit(b) > 0 {
-			index++
-		}
-		b++
-	}
+//IDecode splits the opt into its constituent parts
+func (o *OptMorphFloat) IDecode(z uint) {
+	// pick out sign of cl
+	scl := z&1 > 0
+	z >>= 1
+	// compute cl with sign
 	if scl {
-		o.cl = -o.tC.Float(index)
+		o.cl = -o.tC.Float(z)
 	} else {
-		o.cl = o.tC.Float(index)
+		o.cl = o.tC.Float(z)
 	}
-	o.spl = z.Bit(b) > 0
-	b++
-	index = 0
-	for i := 0; i < o.tP.BitSize(); i++ {
-		index *= 2
-		if z.Bit(b) > 0 {
-			index++
-		}
-		b++
-	}
-	o.pl = o.tP.Float(index)
-
-	scr := z.Bit(b) > 0
-	b++
-	index = 0
-	for i := 0; i < o.tC.BitSize(); i++ {
-		index *= 2
-		if z.Bit(b) > 0 {
-			index++
-		}
-		b++
-	}
+	z >>= o.tC.BitSize()
+	// get sign of pl
+	o.spl = z&1 > 0
+	// compute pl
+	o.pl = o.tP.Float(z)
+	z >>= o.tP.BitSize()
+	// get sigh of cr
+	scr := z&1 > 0
+	z >>= 1
+	// compute cr with sign
 	if scr {
-		o.cr = -o.tC.Float(index)
+		o.cr = -o.tC.Float(z)
 	} else {
-		o.cr = o.tC.Float(index)
+		o.cr = o.tC.Float(z)
 	}
-	o.spr = z.Bit(b) > 0
-	b++
-	index = 0
-	for i := 0; i < o.tP.BitSize(); i++ {
-		index *= 2
-		if z.Bit(b) > 0 {
-			index++
-		}
-		b++
-	}
-	o.pr = o.tP.Float(index)
+	z >>= o.tC.BitSize()
+	// get sign of pr
+	o.spr = z&1 > 0
+	z >>= 1
+	// compute pr
+	o.pr = o.tP.Float(z)
 }
 
 // Opt is function to generate a node output. l,r are the left and right inputs
 // and opt is the encoded operation to be carried out on l,r to return the
 // result.
-func (o *OptMorphFloat) Opt(l, r float64, opt *big.Int) float64 {
-
+func (o *OptMorphFloat) Opt(l, r float64, opt uint) float64 {
+	o.IDecode(opt)// would like to not do this  every time
 	fl := o.cl * math.Pow(math.Abs(l), o.pl)
 	if o.spl && l < 0.0 {
 		fl = -fl
 	}
-	fr := o.cl * math.Pow(math.Abs(r), o.pr)
+	fr := o.cr * math.Pow(math.Abs(r), o.pr)
 	if o.spr && r < 0.0 {
 		fr = -fr
 	}
@@ -328,8 +311,6 @@ type FunFloat struct {
 	output []float64
 	// temporary store of cost value
 	cost float64
-	// store of cost value for optimiser
-	costValue *futil.SFloatCostValue
 
 	// temporary store of difference between output and required output
 	// cost
@@ -347,45 +328,38 @@ type FunFloat struct {
 	rnd *rand.Rand
 	// Timeconstant for cost evaluation
 	Tc float64
-	// treshold in sigmas for sinificant comparison
+	// treshold in sigmas for significant comparison
 	sigmaThres float64
-	// input buffer of samples
-	inbuf []float64
-	// output buffer of samples
-	outbuf []float64
-	// life of buffer in cycles
-	sampleLife int
-	// life counter
-	count int
 }
+
+//FloatTry gives the try structure to use
+type FloatTry = futil.SFloatTry
+
+//FloatFunStub gives interface to setpso
+type FloatFunStub = futil.SFloatFunStub
 
 // NewFunFloat returns a new *FunFloat ready to be used.
 func NewFunFloat(nnode, nbitslookback int, opt OptFloat, sizeCostFactor float64,
 	sampler SamplerFloat, sampleSize int,
-	rnd *rand.Rand, Tc, sigmaThres float64, sampleLife int) *FunFloat {
+	rnd *rand.Rand, Tc, sigmaThres float64) *FloatFunStub {
 	nvar := sampler.InputSize()
 	nout := sampler.OutputSize()
+	var f FunFloat
+	f.Dag = NewDag(nvar, nnode, nout, nbitslookback, opt)
+	f.nodeValues = make([]float64, nnode)
+	f.input = make([]float64, nvar)
+	f.output = make([]float64, nout)
+	f.cost = math.Inf(1)
+	f.difCost = 0.0
+	f.opt = opt
+	f.sampler = sampler
+	f.sizeCostFactor = sizeCostFactor
+	f.sampleSize = sampleSize
+	f.rnd = rnd
+	f.Tc = Tc
+	f.sigmaThres = sigmaThres
 
-	f := FunFloat{NewDag(nvar, nnode, nout, nbitslookback, opt),
-		make([]float64, nnode),
-		make([]float64, nvar),
-		make([]float64, nout),
-		math.Inf(1),
-		futil.NewSFloatCostValue(Tc, sigmaThres),
-		0.0,
-		opt,
-		sampler,
-		sizeCostFactor,
-		sampleSize,
-		rnd,
-		Tc,
-		sigmaThres,
-		make([]float64, nvar*sampleSize),
-		make([]float64, nout*sampleSize),
-		sampleLife,
-		0,
-	}
-	return &f
+	return futil.NewSFloatFunStub(&f, Tc, sigmaThres)
 }
 
 // SetSizeCostFactor sets factor weight to include INode usage cost
@@ -407,39 +381,18 @@ where
 
 using random samples.
 */
-func (f *FunFloat) Cost(x *big.Int) futil.CostValue {
-	f.Idecode(x) // assume satisfies constraints
-	//fmt.Printf("x=%v %s\n",x,f.Decode(x))
-	nvar := f.sampler.InputSize()
-	nout := f.sampler.OutputSize()
-	jin := 0
-	jout := 0
+func (f *FunFloat) Cost(data TryData) (cost float64) {
+	d := data.(*DTryData)
 	f.difCost = 0.0
-	f.cost = float64(f.structureCost) * f.sizeCostFactor
-	f.count--
-	if f.count <= 0 {
-		f.count = f.sampleLife
-		jin = 0
-		jout = 0
-		for i := 0; i < f.sampleSize; i++ {
-			f.sampler.Sample(f.inbuf[jin:jin+nvar], f.outbuf[jout:jout+nout], f.rnd)
-			jin += nvar
-			jout += nout
-		}
-	}
-	jin = 0
-	jout = 0
+	sCost := float64(d.structureCost)
+	cost = sCost * f.sizeCostFactor
+	nout := f.sampler.OutputSize()
 	for j := 0; j < f.sampleSize; j++ {
-
-		f.input = f.inbuf[jin : jin+nvar]
-		f.output = f.outbuf[jout : jout+nout]
-		jin += nvar
-		jout += nout
-		//fmt.Printf("in: %v out: %v \n", f.input, f.output)
+		f.sampler.Sample(f.input, f.output, f.rnd)
 
 		// evaluate dag nodes using f.input from sample
-		for i := 0; i < f.usedNodes; i++ {
-			nd := &f.INodes[i]
+		for i := 0; i < d.usedNodes; i++ {
+			nd := &d.INodes[i]
 			var l float64
 			switch nd.ltype {
 			case ITypeVar:
@@ -447,7 +400,7 @@ func (f *FunFloat) Cost(x *big.Int) futil.CostValue {
 			case ITypeNode:
 				l = f.nodeValues[nd.lindex]
 			case ITypeConst:
-				l = 1.0
+				l = 0
 			}
 			var r float64
 			switch nd.rtype {
@@ -456,24 +409,28 @@ func (f *FunFloat) Cost(x *big.Int) futil.CostValue {
 			case ITypeNode:
 				r = f.nodeValues[nd.rindex]
 			case ITypeConst:
-				r = 1.0
+				r = 0
 			}
 			f.nodeValues[i] = f.opt.Opt(l, r, nd.opt)
 		}
 		// calculate missmatch with output
 		c := 0.0
 		for i := 0; i < nout; i++ {
-			dif := f.nodeValues[f.outNodes[i]] - f.output[i]
+			dif := f.nodeValues[d.outNodes[i]] - f.output[i]
 			c += dif * dif
 		}
 		f.difCost += c
 	}
-	//fmt.Printf("difcost= %f\n",f.difCost)
+	//fmt.Printf("difCost= %f\n",f.difCost)
 	f.difCost /= float64(f.sampleSize)
-	f.cost += f.difCost
-	f.costValue.Set(f.cost)
-	//fmt.Printf("costValue %v \n", f.costValue)
-	return f.costValue
+	cost += f.difCost
+	return
+
+}
+
+//DefaultParam gives a default that satisfies constraints
+func (f *FunFloat) DefaultParam() *big.Int {
+	return big.NewInt(0)
 }
 
 // About string gives a description of the cost function
@@ -485,27 +442,8 @@ func (f *FunFloat) About() string {
 	return s
 }
 
-//Decode gives human radable description of encoding
-func (f *FunFloat) Decode(z *big.Int) string {
-	s := f.DecodeDag(z)
-	return s
-}
-
-//ToConstraint attempts to  give a constraint satisfying hint that matches the hint;
-// pre is the previous constraint satisfying version to hint, which
-// should not be changed. It returns True if it succeeds.
-func (f *FunFloat) ToConstraint(pre, hint *big.Int) bool {
-	ok := f.Idecode(hint)
-	return ok
-}
-
 // Delete hints to the function to remove/replace the ith item
 // it returns true if the function takes the hint
 func (f *FunFloat) Delete(i int) bool {
 	return false
-}
-
-//NewCostValue creates zero cost value
-func (f *FunFloat) NewCostValue() futil.CostValue {
-	return futil.NewSFloatCostValue(f.Tc, f.sigmaThres)
 }

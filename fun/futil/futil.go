@@ -5,7 +5,6 @@ package futil
 
 import (
 	"fmt"
-	"math"
 	"math/big"
 	"math/bits"
 )
@@ -158,264 +157,58 @@ func (sp *Splitter) Join(parts []*big.Int, x *big.Int) (err error) {
 	return nil
 }
 
-//CostValue is the data  type used to store cost values.
-type CostValue interface {
-	// Sets cost value using x clearing out any previous values
-	Set(x interface{})
-	// upates the  cost value with x by combining with previous  cost value
-	// and is mainly used when Cmp returns +2 or -2.
-	Update(x interface{})
-	// Compares to x as a cost value
-	Cmp(x interface{}) int
-	// returns floatingpoint representation of number
-	// of number of bits needed to represent cost as an integer.
-	Fbits() float64
-	// human readable value
-	String() string
-}
+//==============================================
 
-// IntCostValue is the data type used to store big integer cost values
-type IntCostValue struct {
-	cost *big.Int
-}
+//CmpMode indicates modes for Cmp.
+type CmpMode int
 
-// NewIntCostValue is a convenience function for generating a
-// new CostValue and setting it to zero.
-func NewIntCostValue() *IntCostValue {
-	c := new(IntCostValue)
-	c.cost = new(big.Int)
-	return c
-}
+const (
+	//CostMode :Cmp compares costs
+	CostMode CmpMode = iota
+	//TriesMode : Cmp compares tries with best try
+	TriesMode
+)
 
-func (c *IntCostValue) String() string {
-	return c.cost.String()
-}
-
-//Set is used to set c from x.
-func (c *IntCostValue) Set(x interface{}) {
-	if c1, v := x.(*IntCostValue); v {
-		c.cost.Set(c1.cost)
-	} else if c2, v := x.(*big.Int); v {
-		c.cost.Set(c2)
-	} else if c3, v := x.(int64); v {
-		c.cost.SetInt64(c3)
-	}
-
-}
-
-//Update in this case just substitutes the cost value in x
-func (c *IntCostValue) Update(x interface{}) { c.Set(x) }
-
-// Cmp compares  the cost of x with c where x is of type *IntCostValue
-func (c *IntCostValue) Cmp(x interface{}) int {
-	c1 := x.(*IntCostValue)
-	return c.cost.Cmp(c1.cost)
-}
-
-// OpenIntCostValue returns a *IntCostValue from a x with CostValue interface //// that contains it
-
-/*Fbits gives a floating point measure of number of bits in x that takes on non
-integer values to help represent big integer size for plotting. it approximates
-to the log of the big integer.
+/*
+Try is an interface  that is used by  a structure to store a big integer parameter, internal decoding of the parameter, and current evaluated cost of a particular try at finding a good solution to the optimization.The interface is usually used to store  data that depends on the parameter and is mainly manipulated by the cost function.
 */
-func (c *IntCostValue) Fbits() float64 {
-	n := c.cost.BitLen()
-	if n <= 0 {
-		return float64(0)
-	}
-	n--
-	var a big.Int
-	a.SetBit(&a, n, 1)
-	var r big.Rat
-	r.SetFrac(c.cost, &a)
-	f, _ := r.Float64()
-	return f + float64(n)
-
+type Try interface {
+	// returns floating point representation of
+	// of number of bits needed to represent cost as if an integer.
+	Fbits() float64
+	// subset parameter used by Try
+	Parameter() *big.Int
+	// this  gives a human readable interpretation of Try based on the internal decoding of the Parameter
+	Decode() string
+	//this gives human readable cost details such as variance ....
+	Cost() string
+	// decoded data part
+	Data() TryData
 }
 
-// FloatCostValue is used for floating point cost value for functions without noise
-type FloatCostValue struct {
-	cost float64
+//TryData is used to store internal decoded data of a try.
+type TryData interface {
+	// Decode gives a human readable description of TryData content
+	Decode() string
 }
 
-//NewFloatCostValue creates a new FloatCostValue
-func NewFloatCostValue() *FloatCostValue {
-	return new(FloatCostValue)
-}
+//Fun is the common  cost function interface for manipulating TryData
+type Fun interface {
+	// creates an empty try data store for the decoded part of the try
+	CreateData() TryData
+	// returns a default parameter which should satisfy constraints
+	DefaultParam() *big.Int
+	// copies try data from src to dest
+	CopyData(dest, src TryData)
+	// maximum number of bits used in the try parameter
+	MaxLen() int
+	//description of the function
+	About() string
+	//attempts to update hint to give a constraint satisfying try parameter possibly with the help of pre which is assumed to be constraint satisfying. Note it is rare that pre is needed and pre should be un modified by this function
+	Constraint(pre TryData, hint *big.Int) (valid bool)
+	// Delete hints to the function to remove/replace the ith item
+	Delete(i int) bool
 
-//Set is used to set c from x
-func (c *FloatCostValue) Set(x interface{}) {
-	if c1, v := x.(*FloatCostValue); v {
-		*c = *c1
-	} else if c2, v := x.(float64); v {
-		c.cost = c2
-	}
-}
-
-//Update adds the mean of x as raw data to calculate an updated stats of the cost value
-func (c *FloatCostValue) Update(x interface{}) {
-	c.Set(x)
-}
-
-//Cmp compares with x
-func (c *FloatCostValue) Cmp(x interface{}) int {
-	c1 := x.(*FloatCostValue)
-	d := c.cost - c1.cost
-	if d > 0 {
-		return 1
-	} else if d < 0 {
-		return -1
-	} else {
-		return 0
-	}
-}
-
-// Fbits scales the cost value by taking sign(x.mean)log2(1+|x.mean|)
-func (c *FloatCostValue) Fbits() float64 {
-	if c.cost > 0 {
-		return math.Log2(1.0 + c.cost)
-	}
-	return -math.Log2(1 - c.cost)
-}
-
-// String is human readable value
-func (c *FloatCostValue) String() string {
-	return fmt.Sprintf(" %f ", c.cost)
-}
-
-//===================================================================//
-
-/*SFloatCostValue is the data type used to store Float cost values based
-  on simple statistics. Internally it maintains an mean as the cost plus the
-  variance of the cost, which is used to determine if one cost is bigger than
-  another; further evaluations are needed ; two costs are equivalent. Such
-  things are communicated using the COMP function. As well as this it uses an
-  updating weight that incorporates a forgetting process that allows for
-  gradual change to the cost function itself. */
-type SFloatCostValue struct {
-	//treshold used in comparing values
-	thres2 float64
-	// mean as smoothed value
-	mean float64
-	// calculated variance
-	variance float64
-	// current memory gain set to <1
-	bMem float64
-	// current data gain
-	lambda float64
-	// limit on lambda  to ensure response to changing stats
-	minLambda float64
-	// sum of squared cost gains
-	delta float64
-	// weighted sum of squares used to calculate variance of mean
-	isum float64
-	// Time constant
-	Tc float64
-	// sigma threshold factor
-	sigmaThres float64
-}
-
-// NewSFloatCostValue returns a pointer to SFloatCostValue type initialised
-// with a  time constant to stats change of Tc. sigma Thres gives the number of sigmas needed to distinguish between values.
-func NewSFloatCostValue(Tc, sigmaThres float64) *SFloatCostValue {
-
-	c := new(SFloatCostValue)
-	c.Tc = Tc
-	c.sigmaThres = sigmaThres
-	c.minLambda = 1.0 / Tc
-	c.thres2 = sigmaThres * sigmaThres
-	
-
-	return c
-}
-
-//String gives human readable description
-func (c *SFloatCostValue) String() string {
-	return fmt.Sprintf("mean=%f variance=%f\n  TC=%f  threshold =%f ",
-		c.mean, c.variance, c.Tc, c.sigmaThres)
-}
-
-//Set is used to set c from x
-func (c *SFloatCostValue) Set(x interface{}) {
-	if c1, v := x.(*SFloatCostValue); v {
-		*c = *c1
-	} else if c2, v := x.(float64); v {
-		c.mean = c2
-		c.variance = math.Inf(1) // play safe
-		c.bMem = 1.0
-		c.lambda = 1.0
-		c.delta = 1.0
-		c.isum = c2 * c2
-	} else {
-		panic("could not set cost value\n")
-	}
-}
-
-//Update adds the mean of x as raw data to calculate an updated stats of the cost value
-func (c *SFloatCostValue) Update(x interface{}) {
-	if c.variance <= 0.0 {
-		c.Set(x)
-		return
-	}
-	c.lambda = c.lambda / (c.lambda + c.bMem)
-	if c.lambda < c.minLambda {
-		c.lambda = c.minLambda
-		c.bMem = 1.0 - c.minLambda
-	}
-	c.delta = c.bMem*c.bMem*c.delta + 1.0
-	c1 := x.(*SFloatCostValue)
-	l1 := 1.0 - c.lambda
-	l0 := c.lambda
-	c.mean = l1*c.mean + l0*c1.mean
-	c.isum = l1*c.isum + l0*c1.mean*c1.mean
-	if dl := c.delta * l0 * l0; dl < 1.0 {
-		c.variance = (c.isum - c.mean*c.mean) * dl / (1.0 - dl)
-	}
-
-}
-
-//Cmp compares with x
-func (c *SFloatCostValue) Cmp(x interface{}) int {
-	c1 := x.(*SFloatCostValue)
-	d := c.mean - c1.mean
-
-	thr := c.thres2 * (c.variance + c1.variance)
-
-	if d*d < thr {
-		if c.lambda > c.minLambda {
-			if c1.lambda > c.minLambda {
-				if c.variance < c1.variance {
-					return 2
-				}
-				return -2
-			}
-			return -2
-
-		} else if c1.lambda > c.minLambda {
-			return 2
-		}
-		return 0
-	}
-
-	if d > 0 {
-		return 1
-	} else if d < 0 {
-		return -1
-	} else {
-		return 0
-	}
-}
-
-// Fbits scales the cost value by taking sign(x.mean)log2(1+|x.mean|)
-func (c *SFloatCostValue) Fbits() float64 {
-	a := math.Abs(c.mean)
-	fb := math.Log2(1.0 + a)
-	const maxValue = 10.0
-	if fb > maxValue {
-		fb = maxValue
-	}
-	if c.mean > 0 {
-		return fb
-	}
-	return -fb
+	// Idecode decodes the parameter z and stores the result in data.
+	IDecode(data TryData, z *big.Int)
 }

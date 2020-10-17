@@ -25,7 +25,7 @@ func main() {
 	dispSize := 500
 	ac := lincircles.NewAnimator(skipLen, dispSize)
 	man := psokit.NewMan()
-	man.SetNthink(500)
+	man.SetNthink(50) // was 50
 	man.SetNpart(61)
 	man.SetPsoCase("clpso-0")
 	man.SetFunCase("circle-1")

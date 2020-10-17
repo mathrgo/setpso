@@ -25,7 +25,7 @@ func main() {
 	dispSize := 500
 	ac := circles.NewAnimator(skipLen, dispSize)
 	man := psokit.NewMan()
-	man.SetNthink(1)
+	man.SetNthink(1000)
 	man.SetNpart(61)
 	man.SetPsoCase("clpso-0")
 	man.SetFunCase("circle-1")

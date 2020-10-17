@@ -42,7 +42,7 @@ sequence. the supported interfaces are:
 //type CreateAct interface{ Create() Act }
 
 /*
-ActInit is the interface for pre runs initialising Action. This is expected to
+ActInit is the interface for pre runs initializing Action. This is expected to
 be run before the cost-function and SPSO instances are available; it is used to
 configure man before the run commences; it typically is used to provide a
 command line interface or even include new things that are not part of the
@@ -51,7 +51,7 @@ installed options.
 type ActInit interface{ Init(man *ManPso) }
 
 /*
-ActRunInit is the interface for a run initialising Action. It can change the
+ActRunInit is the interface for a run initializing Action. It can change the
 cost-function and SPSO instances and even swap them if you are not interested in
 the runs being statistically independent!
 */
@@ -61,7 +61,7 @@ type ActRunInit interface{ RunInit(man *ManPso) }
 ActUpdate is the interface for post Update  per iteration Action. This may be
 used for ultra fine  logging of  data during a debug dump, update a variance
 calculation, stop the run before it reaches a maximum number of iterations or
-even change the nature of the function being optimised.
+even change the nature of the function being optimized.
 */
 type ActUpdate interface{ Update(man *ManPso) }
 
@@ -202,7 +202,7 @@ String gives a description of the man settings
 func (man *ManPso) String() string {
 	s := "ManPso Settings:\n"
 	s += fmt.Sprintf("cost-function = %s\t", man.funCase)
-	
+
 	s += fmt.Sprintf("SPSO = %s\n", man.psoCase)
 	if man.dbug {
 		s += fmt.Sprintf("Detailed debug for %d iterations\n", man.stopAt)

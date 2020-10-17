@@ -16,23 +16,23 @@ type NewFun1 struct {
 
 //Create creates the example 1 for PSO kit.
 func (fc *NewFun1) Create(fsd int64) psokit.Fun {
-	nmode := 4
+	nMode := 3
 	nbits := 20
-	margin := 1.0
+	margin := 0.3
 	sigma := 0.1
-	Tc := 10000.0
-	sigmaThres := 4.0
+	Tc := 100.0
+	SigmaMargin :=3.0
 
-	f := multimode.NewFun(nmode, nbits, margin, sigma,
-		Tc, sigmaThres, fsd)
+	f := multimode.NewFun(nMode, nbits, margin, sigma,
+		Tc, SigmaMargin, fsd)
 	return f
 }
 
 func main() {
 	var fc NewFun1
 	man := psokit.NewMan()
-	man.SetNthink(60)
-	man.SetNpart(3)
+	man.SetNthink(1)
+	man.SetNpart(30)
 	man.SetPsoCase("clpso-0")
 	man.SetFunCase("mms-1")
 	if err := man.AddFun("mms-1", "multimode function with noise", &fc); err != nil {

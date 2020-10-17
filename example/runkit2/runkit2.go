@@ -24,12 +24,12 @@ func main() {
 	// create a run manager
 	man := psokit.NewMan()
 	// set number of iterations between each data output
-	man.SetNthink(1200)
+	man.SetNthink(120)
 	// set the number of particles
 	man.SetNpart(61)
 	// set run seed linear function of run number
 	man.SetPsoSeed(31427, 31)
-	// use a built in SPSO optimiser
+	// use a built in SPSO optimizer
 	man.SetPsoCase("clpso-0")
 	// think of a name for the creator
 	man.SetFunCase("primeFactoring-1")
@@ -42,7 +42,8 @@ func main() {
 		"use-cmd-options",
 		"print-headings",
 		"print-result",
-		"plot-personal-best"); err != nil {
+		"plot-personal-best",
+		"run-progress"); err != nil {
 		fmt.Println(err)
 	}
 	// do the runs

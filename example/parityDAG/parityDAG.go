@@ -36,7 +36,7 @@ func main() {
 
 	var fc parityFun1
 	man := psokit.NewMan()
-	man.SetNthink(60)
+	man.SetNthink(10)
 	man.SetNpart(61)
 	man.SetPsoCase("clpso-0")
 	man.SetFunCase("parity-5-1")
@@ -47,7 +47,8 @@ func main() {
 		"use-cmd-options",
 		"print-headings",
 		"print-result",
-		"plot-personal-best"); err != nil {
+		"plot-personal-best",
+		"run-progress"); err != nil {
 		fmt.Println(err)
 	}
 	man.Run()

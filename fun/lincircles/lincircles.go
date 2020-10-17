@@ -11,6 +11,8 @@ import (
 	"os"
 	"text/template"
 
+	"github.com/mathrgo/setpso"
+
 	"github.com/mathrgo/setpso/psokit"
 
 	"github.com/mathrgo/setpso/fun/futil"
@@ -21,143 +23,108 @@ type Circle struct {
 	x, r float64
 }
 
-//CostValue  contains the results of calculating the circle cost
-type CostValue struct {
-	value       float64
-	UsedCircles []Circle
-}
-
-//NewCostValue creates a new circles CostValue
-func NewCostValue() *CostValue {
-	c := new(CostValue)
-	c.UsedCircles = make([]Circle, 0, 10)
-	return c
-}
-
-//Set is used to set c from x
-func (c *CostValue) Set(x interface{}) {
-	if c1, v := x.(*CostValue); v {
-		c.value = c1.value
-		c.UsedCircles = c.UsedCircles[:0]
-		c.UsedCircles = append(c.UsedCircles, c1.UsedCircles...)
-	}
-}
-
-//SetValue just sets the value without changing the used circles
-func (c *CostValue) SetValue(z float64) {
-	c.value = z
-}
-
-//AddCircle just adds another circle
-func (c *CostValue) AddCircle(x Circle) {
-	c.UsedCircles = append(c.UsedCircles, x)
-
-}
-
-//Circles returns the array of used circles
-func (c *CostValue) Circles() []Circle {
-	return c.UsedCircles
-}
-
-//Clear removes the used circles
-func (c *CostValue) Clear() {
-	c.UsedCircles = c.UsedCircles[:0]
-}
-
-//Update adds the mean of x as raw data to calculate an updated stats of the cost value
-func (c *CostValue) Update(x interface{}) {
-	c.Set(x)
-}
-
-//Cmp compares with x
-func (c *CostValue) Cmp(x interface{}) int {
-	c1 := x.(*CostValue)
-	d := c.value - c1.value
-	if d > 0 {
-		return 1
-	} else if d < 0 {
-		return -1
-	} else {
-		return 0
-	}
-}
-
-//Fbits scales the cost value by taking sign(x.mean)log2(1+|x.mean|)
-func (c *CostValue) Fbits() float64 {
-	if c.value > 0 {
-		return math.Log2(1.0 + c.value)
-	}
-	return -math.Log2(1 - c.value)
-}
-
-// String is human readable value
-func (c *CostValue) String() string {
-	var s string
-	s = fmt.Sprintf(" %f number of used circles =%d\n", c.value,
-		len(c.UsedCircles))
-	for i := range c.UsedCircles {
-		p := c.UsedCircles[i]
-		s += fmt.Sprintf("%f\n", p.x)
-	}
-	return s
-}
-
 // Fun is the circles packaging cost function
 type Fun struct {
 	radius, radius0, radius1 float64
 	valueNbits               int
-	circles                  []Circle
 	d2, d20, d21             float64
 	birthBonus               float64
+	n                        int
 }
 
-//NewCostValue creates a zero cost value
-func (f *Fun) NewCostValue() futil.CostValue {
+//Try is the try interface used by setpso
+type Try = setpso.Try
 
-	return NewCostValue()
+//FunTry gives the try structure to use
+type FunTry = futil.FloatTry
+
+//TryData is the interface for FunTryData used in package futil
+type TryData = futil.TryData
+
+//FunTryData is the decoded data structure for a try
+type FunTryData struct {
+	UsedCircles []Circle
+	circles     []Circle
 }
 
-// New generates a circle packing cost function suitable for SPSO.
+//IDecode decodes z into d
+func (f *Fun) IDecode(data TryData, z *big.Int) {
+	t := data.(*FunTryData)
+	jb := 0
+	scale := math.Exp2(1 - float64(f.valueNbits))
+	for i := range t.circles {
+		var x uint
+		t.circles[i].r = f.radius
+		x = 0
+		je := jb + f.valueNbits
+		for j := jb; j < je; j++ {
+			x *= 2
+			x += z.Bit(j)
+		}
+		t.circles[i].x = float64(x)*scale - 1.0
+
+		jb += f.valueNbits
+	}
+
+}
+
+// Decode requests the function to give a meaningful interpretation of
+// d.
+func (d *FunTryData) Decode() string {
+	s := fmt.Sprintf(" number of used circles =%d\n", len(d.UsedCircles))
+	for i := range d.UsedCircles {
+		c := d.UsedCircles[i]
+		s += fmt.Sprintf("circle %d x=%f \n", i, c.x)
+	}
+	return s
+}
+
+//FloatFunStub gives interface to setpso
+type FloatFunStub = futil.FloatFunStub
+
+//New generates a circle packing cost function suitable for SPSO.
 // 'radius' is the radius of the circles to be packed;
 // 'innerFuzz' is reducing factor on 'radius' to get rejection radius
-// 'outerFuzz' is increasing factor on 'radius' to get maximum influence radius // 'valueNbits' is the number of bits used to locate a coordinate of a packed
+// 'outerFuzz' is increasing factor on 'radius' to get maximum influence radius // 'value. Nbits' is the number of bits used to locate a coordinate of a packed
 // circle.
 // 'birthBonus' is the reduction of cost due to including a circle
-func New(radius float64, innerFuzz, outerFuzz float64, valueNbits int, birthBonus float64) *Fun {
+func New(radius float64, innerFuzz, outerFuzz float64, valueNbits int, birthBonus float64) *FloatFunStub {
 	var f Fun
 	f.radius = radius
 	f.radius0 = radius * (1.0 - innerFuzz)
 	f.radius1 = radius * (1.0 + outerFuzz)
 	f.valueNbits = valueNbits
-	n := int(math.Ceil(1.0 / f.radius))
-	f.circles = make([]Circle, n)
+	f.n = int(math.Ceil(1.0 / f.radius))
 	f.d2 = 4.0 * f.radius * f.radius
 	f.d20 = 4.0 * f.radius0 * f.radius0
 	f.d21 = 4.0 * f.radius1 * f.radius1
 	f.birthBonus = birthBonus
-	return &f
+	return futil.NewFloatFunStub(&f)
 }
 
-//Len gives the maximum number of circlse in each try
-func (f *Fun) Len() int {
-	return len(f.circles)
+//CreateData creates a empty structure for decoded try
+func (f *Fun) CreateData() TryData {
+	t := new(FunTryData)
+	t.circles = make([]Circle, f.n)
+	t.UsedCircles = make([]Circle, 0, f.n)
+	return t
 }
 
-// Cost returns the cost of the chosen packing circles
-func (f *Fun) Cost(x *big.Int) futil.CostValue {
-	f.IDecode(x)
-	var cv CostValue
-	cv.Clear()
-	cost := 0.0
+//Cost returns the remainder after dividing p in to the prime product
+func (f *Fun) Cost(data TryData) (cost float64) {
+
+	d := data.(*FunTryData)
+	d.UsedCircles = d.UsedCircles[:0]
+	cost = 0.0
 	maxr := 1.0 - f.radius
 	maxr2 := maxr * maxr
 	dd0 := f.d2 - f.d20
 	dd1 := f.d21 - f.d2
-	for i := range f.circles {
-		c := f.circles[i]
+	for i := range d.circles {
+		c := d.circles[i]
 		if maxr2 >= c.x*c.x {
 
-			uc := cv.Circles()
+			uc := d.UsedCircles
 			ok := len(uc) == 0
 			overlapped := false
 			for i1 := range uc {
@@ -177,26 +144,38 @@ func (f *Fun) Cost(x *big.Int) futil.CostValue {
 				}
 			}
 			if ok && !overlapped {
-				cv.AddCircle(c)
+				d.UsedCircles = append(d.UsedCircles, c)
 				cost -= f.birthBonus
 			}
 
 		}
 
 	}
-	cv.SetValue(cost)
-	return &cv
+	return
 }
 
-// MaxLen returns the number of elements in the encoded parameter
+//DefaultParam gives a default that satisfies constraints
+func (f *Fun) DefaultParam() *big.Int {
+	return big.NewInt(0)
+}
+
+//CopyData copies src to dest
+func (f *Fun) CopyData(dest, src TryData) {
+	s := src.(*FunTryData)
+	d := dest.(*FunTryData)
+	d.circles = d.circles[:0]
+	d.circles = append(d.circles, s.circles...)
+	d.UsedCircles = d.UsedCircles[:0]
+	d.UsedCircles = append(d.UsedCircles, s.UsedCircles...)
+}
+
+// MaxLen returns the number of elements in the subset sum problem
 func (f *Fun) MaxLen() int {
-	return 2 * len(f.circles) * f.valueNbits
+	return f.n * f.valueNbits
 }
 
-// ToConstraint uses the previous parameter pre and the updating hint parameter
-// to attempt to produce an update to hint which satisfies solution constraints
-// and returns valid = True if succeeds
-func (f *Fun) ToConstraint(pre, hint *big.Int) (valid bool) {
+//Constraint attempts to constrain hint possibly using a copy of pre to do this
+func (f *Fun) Constraint(pre TryData, hint *big.Int) (valid bool) {
 	valid = true
 	return
 }
@@ -208,38 +187,22 @@ func (f *Fun) About() string {
 	s += fmt.Sprintf("circle  radius = %f  inner radius = %f outer radius %f\n coordinate resolution= %f  birth bonus= %f\n", f.radius, f.radius0, f.radius1, math.Exp2(float64(1-f.valueNbits)), f.birthBonus)
 
 	return s
-
-}
-
-//IDecode  extracts the raw circle positions from z
-func (f *Fun) IDecode(z *big.Int) {
-	jb := 0
-	scale := math.Exp2(1 - float64(f.valueNbits))
-	for i := range f.circles {
-		var x uint
-		f.circles[i].r = f.radius
-		x = 0
-		je := jb + f.valueNbits
-		for j := jb; j < je; j++ {
-			x *= 2
-			x += z.Bit(j)
-		}
-		f.circles[i].x = float64(x)*scale - 1.0
-
-		jb += f.valueNbits
-	}
-}
-
-// Decode requests the function to give a meaningful interpretation of
-// z
-func (f *Fun) Decode(z *big.Int) string {
-	var s string = ""
-
-	return s
 }
 
 // Delete hints to the function to remove/replace the ith item
 func (f *Fun) Delete(i int) bool { return false }
+
+//==========================================
+
+//Circles returns the array of used circles
+func (d *FunTryData) Circles() []Circle {
+	return d.UsedCircles
+}
+
+//Len gives the maximum number of circles in each try
+func (f *Fun) Len() int {
+	return f.n
+}
 
 //Store stores circles  for plotting
 type Store struct {
@@ -250,7 +213,7 @@ type Store struct {
 }
 
 // NewStore  creates a circle store assuming dataLen data points but with
-// a skipLen skip interval on this data each snapshot storing atmost nCircles;
+// a skipLen skip interval on this data each snapshot storing at most nCircles;
 // dispSize is the size of animation display in pixels.
 func NewStore(dataLen, skipLen, nCircles, dispSize int) *Store {
 	var cs Store
@@ -265,7 +228,7 @@ func (cs *Store) Clear() {
 	cs.dispList = cs.dispList[:0]
 }
 
-// Append appends some circlse transformed for display followed by a zero entry
+// Append appends some circles transformed for display followed by a zero entry
 // as an end marker to the list
 func (cs *Store) Append(circles []Circle) {
 	for i := range circles {
@@ -312,16 +275,12 @@ func NewAnimator(skipLen, dispSize int) *Animator {
 	return ac
 }
 
-//RunInit initialises it for a run
+//RunInit initializes it for a run
 func (ac *Animator) RunInit(man *psokit.ManPso) {
 	fmt.Println("Using circle animator")
-	if fc, ok := man.F().(*Fun); ok {
-		ac.f = fc
-		ac.store = NewStore(man.Datalength(), ac.skipLen, ac.f.Len(), ac.dispSize)
-
-	} else {
-		panic(fmt.Errorf("cost function is not a circles one"))
-	}
+	fc := man.F().(*FloatFunStub)
+	ac.f = fc.Fun().(*Fun)
+	ac.store = NewStore(man.Datalength(), ac.skipLen, ac.f.Len(), ac.dispSize)
 
 }
 
@@ -332,9 +291,9 @@ func (ac *Animator) DataUpdate(man *psokit.ManPso) {
 		return
 	}
 	ac.count = ac.skipLen
-	cost := man.P().GlobalCost()
-	c := cost.(*CostValue)
-	ac.store.Append(c.Circles())
+	i := man.P().BestParticle()
+	data := man.P().LocalBestTry(i).Data().(*FunTryData)
+	ac.store.Append(data.Circles())
 
 }
 

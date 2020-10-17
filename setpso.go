@@ -10,13 +10,15 @@ import (
 	"github.com/mathrgo/setpso/fun/futil"
 )
 
+//Try interface from futil
+// It essentially contains all the data that depends on the parameter being tried for a solution of the optimization problem.
+type Try = futil.Try
+
 /*
-Fun is the interface to the function that calculates the cost and the number
-of bits used in the binary pattern. The binary pattern is stored as a big
+Fun is the interface to the function that evaluates the cost of tries. The try parameter is a binary pattern stored as a big
 integer. The integer can be regarded as a sub set of integers from 0 to
 MaxLen()-1 where i in this range is a member of the sub set if the ith bit is
-1. Cost() gives the cost associated by the function to a binary pattern
-(stored as a big integer). MaxLen() returns  the maximum number of bits in
+1.  MaxLen() returns  the maximum number of bits in
 the pattern. ToConstraint() attempts to modify hint to be constraint
 satisfying. while possibly using pre  to aid in this process. pre should not be
 changed during this process. It returns true if it succeeds. By convention pre
@@ -31,7 +33,7 @@ Providing a Meaningful Interpretation of Parameters
 
 Representing a particle's Parameters as a binary string or subset may not be
 easily  interpreted  as a meaningful representation of a solution to a
-combinatorial optimisation so the cost function must provide an easily
+combinatorial optimization so the cost function must provide an easily
 understood description of a Parameter as a string supplied by the Decode()
 function.
 
@@ -48,24 +50,45 @@ items that may result in an improved cost. Typically this feature is not used
 and a call to  Delete() returns false.
 */
 type Fun interface {
-	// evaluated cost where a lower cost is better
-	Cost(x *big.Int) futil.CostValue
+	//creates a new Try which is a pointer to a structure using  a default parameter that should satisfy constraints and updates Try's cost and internal decode.
+	NewTry() Try
+	// setup t from x, where z is parameter assumed to satisfy constraints and it also computes dependants such as cost
+	SetTry(t Try, z *big.Int)
+
+	// sets  the try by copying src to dest
+	Copy(dest, src Try)
+
+	// updates cost evaluation of a try where a lower cost is better
+	// this is needed when the cost changes
+	UpdateCost(x Try)
+
+	// Cmp checks to see if y is better than x
+	// for mode = futil.CostMode:
+	// compare two tries with a spread of uncertainty from -1.0 to 1.0. -1.0 for
+	// definitely cost(x) < cost(y) and 1.0 for definitely cost(x) > cost(y).
+	// A deterministic cost should always return -1.0 or 1.0 with a value of
+	// -1.0 if the costs are equal.
+	// for mode = futil.TriesMode: (used only when cost is not deterministic)
+	// compare how successful  y has been in being better than  an x
+	//and updates y's success stats.
+	// While being compared a value > 1.0 indicates y should replace x; a value
+	// < -1.0 indicates y should be removed as a candidate.
+	Cmp(x, y Try, mode futil.CmpMode) float64
+
 	// maximum number of bits in the parameter big integer which is the
 	// maximum number of elements in the subset
+	// at the moment this is fixed during a run but in the future could vary possibly to incorporate some form of subroutine use.
 	MaxLen() (maxlen int)
 	// string giving a description of the cost function
 	About() (s string)
-	// this attempts to  give a constraint satisfying hint that matches the hint;
-	// pre is the previous constraint satisfying version to hint, which
-	// should not be changed
-	ToConstraint(pre, hint *big.Int) bool
-	// this requests the function to give a meaningful interpretation of
-	// z as a Parameters subset for the function assuming z satisfies constraints
-	Decode(z *big.Int) (s string)
-	// this hints to the function to remove/replace the ith item
+	// this attempts to  give a constraint satisfying Try  in  pre that matches the hint by modifying hint
+	// pre is the previous try to be replaced. on success it returns true otherwise it returns false and should leave pre un changed.
+	ToConstraint(pre Try, hint *big.Int) bool
+
+	// this hints to the function to replace the ith particle-item
+	// if it returns True the function has replaced the item with a new meaning
+	// thus modifying the decoder.
 	Delete(i int) bool
-	//creates zero cost value
-	NewCostValue() futil.CostValue
 }
 
 /*
@@ -77,18 +100,16 @@ useful plotting functions.
 type PsoInterface interface {
 	// single state update to all particles in the PSO
 	Update()
-	// best global Parameters so far
-	GlobalParams() *big.Int
-	// the cost of the global best
-	GlobalCost() futil.CostValue
+	// best particle Id
+	BestParticle() int
 	// number of particles
 	Nparticles() int
-	// current parameters of the ith Particle
-	Params(i int) *big.Int
-	// Local-best cost of the ith Particle
-	LocalBestCost(i int) futil.CostValue
-	// Local-best Parameters of the ith Particle
-	LocalBestParameters(i int) *big.Int
+	// array of particles
+	Part(i int) *Particle
+	// current try of the ith Particle
+	CurrentTry(i int) Try
+	// Local-best try of the ith Particle
+	LocalBestTry(i int) Try
 	// interface for requesting debug output based on cmd
 	PrintDebug(w io.Writer, cmd string)
 	//Heuristics returns a copy of the master heuristics
@@ -99,21 +120,31 @@ type PsoInterface interface {
 
 // Particle is the state of a member of the PSO
 type Particle struct {
-	// current parameters normalised to have similar effect and search area
-	params *big.Int
+	// current try
+	current Try
+	// list of tries that did not quite make it to bestTry
+	tries []Try
 	// this is used as a raw update before mapping to a constraint satisfying
 	// state
 	hint *big.Int
-	// current computed cost
-	cost futil.CostValue
 	// pointer to group the particle belongs to
 	group *Group
-	// best parameter values so far
-	bestParams *big.Int
-	//  best personal cost so far corresponding to this parameter
-	best futil.CostValue
+	// best try so far
+	bestTry Try
 	// current  flipping probability requests for each bit component
 	vel []float64
+
+	debug bool
+}
+
+//BestTry returns the best try
+func (p *Particle) BestTry() Try {
+	return p.bestTry
+}
+
+//CurrentTry returns current try
+func (p *Particle) CurrentTry() Try {
+	return p.current
 }
 
 //Group is a collection of particles with same heuristic settings
@@ -124,15 +155,13 @@ type Group struct {
 	members []int
 	// list of update targets by index (normally of length <= 2)
 	targets []int
-	// this gives the cost of the best member
-	bestCost futil.CostValue
 	// this gives the index for the  best member in Pt
 	bestMember int
 	// heuristics for the group
 	hu *PsoHeuristics
 }
 
-// Pso is the Particle swarm optimiser
+// Pso is the Particle swarm optimizer
 type Pso struct {
 	// random number generator
 	rnd *rand.Rand
@@ -140,21 +169,17 @@ type Pso struct {
 	Pt []Particle
 	// mapped collection of groups of particles (with same heuristic settings)
 	gr map[string]*Group
-	// group id with best cost
-	bestGroup *Group
 	//scratch pad for intermediate parameter calculations
 	temp *big.Int
 	//scratch pad for intermediate velocity calculation
 	tempVel []float64
-	// this gives the cost of the global best
-	bestCost futil.CostValue
-	// this gives the parameters for the global best
-	bestParams *big.Int
+	// this gives the index of the particle with best try
+	bestParticle int
 	// cost function
 	fun Fun
 	// maximum number of elements in sets
 	maxLen int
-	// max integer?
+	// max integer; all parameters integer values less than this
 	maxN *big.Int
 	// number of particles
 	n int
@@ -178,9 +203,9 @@ func (pso *Pso) NominalL() (l float64) {
 
 /*
 NewPso sets up a PSO with a swarm of n particles. fun is the costing function
-interface. Each Particle has a big integer Parameter. To initialise the
+interface. Each Particle has a big integer Parameter. To initialize the
 parameter set values are uniformly randomly chosen with integer values up to
-Func.MaxLen(); ToConstraint() is used on these random choices with repeated
+Func.MaxLen()bits; ToConstraint() is used on these random choices with repeated
 use  of random choice until each Particle has an initial Parameters that
 satisfies the cost function  constraints on the Parameters. Default heuristics
 are applied  to the "root" Group and all particles are added to this group.
@@ -206,10 +231,6 @@ func NewPso(n int, fun Fun,
 
 	g.targets = make([]int, 1, 2)
 
-	g.bestCost = pso.fun.NewCostValue()
-
-	pso.bestCost = pso.fun.NewCostValue()
-	pso.bestParams = big.NewInt(0)
 	pso.Pt = make([]Particle, n)
 	maxN := big.NewInt(0)
 	maxN.SetBit(maxN, pso.maxLen, 1)
@@ -217,32 +238,32 @@ func NewPso(n int, fun Fun,
 	for i := range pso.Pt {
 		p := &pso.Pt[i]
 		p.group = g
-		p.params = big.NewInt(0)
 		p.hint = big.NewInt(0)
+		p.current = pso.fun.NewTry()
+		p.bestTry = pso.fun.NewTry()
 		//search for state that satisfies function constraints
 		searching := true
 		for searching {
 			p.hint.Rand(pso.rnd, maxN)
-			searching = !pso.fun.ToConstraint(p.params, p.hint)
+			searching = !pso.fun.ToConstraint(p.current, p.hint)
+			//fmt.Printf("part= %d param= %v  %s %s \n", i, p.current.Parameter(), p.current.Decode(), p.current.Cost())
 		}
-		p.params.Set(p.hint)
-		p.cost = pso.fun.NewCostValue()
+		pso.fun.Copy(p.bestTry, p.current)
 		g.members[i] = i
-		p.cost.Set((pso.fun).Cost(p.params))
-		p.best = pso.fun.NewCostValue()
-		p.best.Set(p.cost)
-		p.bestParams = big.NewInt(0)
-		p.bestParams.Set(p.params)
 		p.vel = make([]float64, pso.maxLen)
 
-		//fmt.Printf(" %d cost= %v\n", i, p.best)
 	}
 	pso.UpdateGlobal()
 	return &pso
 }
 
+//Part returns  ith particle
+func (pso *Pso) Part(i int) *Particle {
+	return &pso.Pt[i]
+}
+
 /*UpdateGroup does housekeeping for the group k
-it calculates the best cost and the particle in group that gives this.
+it calculates the best try and the particle in group that gives this.
 Note that it looks for the best in the current iteration and disregards historic
 best costs even if they were better.
 */
@@ -252,17 +273,17 @@ func (pso *Pso) UpdateGroup(g *Group) {
 		return
 	}
 	g.bestMember = g.members[0]
-	g.bestCost.Update(pso.Pt[g.bestMember].best)
-	for i := range g.members[1:] {
+	for i := range g.members {
 		id := g.members[i]
-		p := &pso.Pt[id]
-		compResult := pso.CleanCmp(p.best, g.bestCost,
-			p.bestParams, pso.Pt[g.bestMember].bestParams)
-		if compResult < 0 {
-			g.bestCost.Set(p.best)
+		result := pso.fun.Cmp(pso.Pt[g.bestMember].bestTry,
+			pso.Pt[id].bestTry, futil.CostMode)
+		if result > 0.0 {
 			g.bestMember = id
 		}
 	}
+	// if g.bestMember != 0 {
+	// 	fmt.Printf("id=%d ", g.bestMember)
+	// }
 }
 
 /*UpdateGlobal updates the global best by calling UpdateGroup()
@@ -273,30 +294,24 @@ func (pso *Pso) UpdateGlobal() {
 	for _, g := range pso.gr {
 		pso.UpdateGroup(g)
 	}
-	pso.bestGroup = nil
-
+	pso.bestParticle = 0
 	for _, g := range pso.gr {
 		if len(g.members) > 0 {
-			if pso.bestGroup != nil {
-				compResult := pso.CleanCmp(g.bestCost,pso.bestCost,
-					pso.Pt[g.bestMember].bestParams,pso.bestParams)
-				if compResult < 0 {
-					pso.bestCost.Set(g.bestCost)
-					pso.bestGroup = g
-				}
-			} else {
-				pso.bestCost.Set(g.bestCost)
-				pso.bestGroup = g
+			//fmt.Printf("bestmember= %d", g.bestMember)
+			compResult := pso.fun.Cmp(pso.Pt[pso.bestParticle].bestTry,
+				pso.Pt[g.bestMember].bestTry, futil.CostMode)
+			if compResult > 0.0 {
+				pso.bestParticle = g.bestMember
+
 			}
+
 		}
 	}
-	//copy across the best case
-	pso.bestParams.Set(pso.Pt[pso.bestGroup.bestMember].bestParams)
 }
 
-// GlobalCost returns the current global best cost.
-func (pso *Pso) GlobalCost() futil.CostValue {
-	return pso.bestCost
+//BestParticle returns the current global best particle.
+func (pso *Pso) BestParticle() int {
+	return pso.bestParticle
 }
 
 // Nparticles returns the number of particles in use.
@@ -304,25 +319,14 @@ func (pso *Pso) Nparticles() int {
 	return len(pso.Pt)
 }
 
-//Params returns the current parameters for the ith particle.
-func (pso *Pso) Params(i int) *big.Int {
-	return pso.Pt[i].params
+//CurrentTry returns the current try for the ith particle
+func (pso *Pso) CurrentTry(i int) Try {
+	return pso.Pt[i].current
 }
 
-//LocalBestCost returns the current local best cost  for the ith particle.
-func (pso *Pso) LocalBestCost(i int) futil.CostValue {
-	return pso.Pt[i].best
-}
-
-//LocalBestParameters returns the the Parameters of the Local-best for the
-// ith Particle.
-func (pso *Pso) LocalBestParameters(i int) *big.Int {
-	return pso.Pt[i].bestParams
-}
-
-// GlobalParams returns the parameters for the global best cost.
-func (pso *Pso) GlobalParams() *big.Int {
-	return pso.bestParams
+//LocalBestTry returns Local-best try of the ith Particle
+func (pso *Pso) LocalBestTry(i int) Try {
+	return pso.Pt[i].bestTry
 }
 
 //Heuristics returns a copy of the master heuristics
@@ -340,39 +344,6 @@ func CardinalSize(x *big.Int) (card int) {
 	}
 	return
 }
-
-/*
-RandomSubset converts z to a subset of z by using a probability p for
-selecting each member of z as a set. the updated z is returned using the pso
-random number generator.
-*/
-// func RandomSubset(z *big.Int, p float64, rnd *rand.Rand) *big.Int {
-// 	n := z.BitLen()
-// 	for i := 0; i < n; i++ {
-// 		if z.Bit(i) == 1 {
-// 			if rnd.Float64() > p {
-// 				z.SetBit(z, i, 0)
-// 			}
-// 		}
-// 	}
-// 	return z
-// }
-
-//ToggleRandomSet takes the set z and randomly toggles in and out
-// m members out of n members and returns z.
-// func ToggleRandomSet(z *big.Int, m int, n int, rnd *rand.Rand) *big.Int {
-// 	for i := 0; i < m; i++ {
-// 		j := rnd.Intn(n)
-// 		b := z.Bit(j)
-// 		if b == 0 {
-// 			b = 1
-// 		} else {
-// 			b = 0
-// 		}
-// 		z.SetBit(z, j, b)
-// 	}
-// 	return z
-// }
 
 /*
 BlurTarget blurs the target set displacement based on its CardinalSize. Normally
@@ -396,48 +367,89 @@ func (pso *Pso) BlurTarget(x *big.Int, id int, l, l0 float64) {
 }
 
 /*
-CleanCmp ensures that the cost functions cost1,cost2 at parameters param1,param2 can be compared by aplying updates until the Cmp function can return a comparison
-*/
-func (pso *Pso) CleanCmp(cost1, cost2 futil.CostValue,
-	param1, param2 *big.Int) int {
-	compResult := cost1.Cmp(cost2)
-	for compResult > 1 || compResult < -1 {
-		if compResult > 1 {
-			cost2.Update(pso.fun.Cost(param2))
-		} else {
-			cost1.Update(pso.fun.Cost(param1))
-		}
-		compResult = cost1.Cmp(cost2)
-		//fmt.Printf("cmp =%d cost1=%v cost2=%v \n", compResult, cost1, cost2)
-	}
-	return compResult
-}
-
-/*
 SetParams sets the parameters of the id th particle updating  the resulting
 cost and  personal best case. It also revaluates the personal best cost in
 case the function has changed.
 */
 func (pso *Pso) SetParams(id int) {
 	p := &pso.Pt[id]
+	pso.fun.UpdateCost(p.bestTry)
 	// update cost if the hint can be converted to a constraint satisfying
 	// subset
-	if pso.fun.ToConstraint(p.params, p.hint) {
-		p.params.Set(p.hint)
-		rawBest := pso.fun.Cost(p.bestParams)
-		p.best.Update(rawBest)
-		rawCost := pso.fun.Cost(p.params)
-		p.cost.Set(rawCost)
-		compResult := pso.CleanCmp(p.cost, p.best, p.params, p.bestParams)
+	if pso.fun.ToConstraint(p.current, p.hint) {
+		// if p.debug {
+		// 	fmt.Printf("constraint update part= %d  %s %s \n", id, p.bestTry.Decode(), p.bestTry.Cost())
+		// 	p.debug = false
+		// }
 
-		if compResult < 0 {
-			p.best.Set(p.cost)
-			p.bestParams.Set(p.params)
-			//fmt.Printf("best cost = %v", p.best)
+		for i := range p.tries {
+			pso.fun.UpdateCost(p.tries[i])
+		}
+		p.lookForBetterTry(pso)
+		compResult := pso.fun.Cmp(p.bestTry, p.current, futil.CostMode)
+		//fmt.Printf("compResult = %f \n", compResult)
+
+		if compResult > pso.hu.Threshold {
+			//p.putOntoTryList(pso, p.bestTry)
+			pso.fun.Copy(p.bestTry, p.current)
+			//fmt.Printf("part= %d  %s %s \n", id, p.bestTry.Decode(), p.bestTry.Cost())
+			// if p.bestTry.Fbits() < 8.2 {
+			// 	fmt.Printf("part= %d  %s %s \n", id, p.bestTry.Decode(), p.bestTry.Cost())
+			// 	p.debug = true
+			// pso.fun.UpdateCost(p.bestTry)
+			// fmt.Printf("update part= %d  %s %s \n", id, p.bestTry.Decode(), p.bestTry.Cost())
+
+			//}
+
+		} else if compResult > -pso.hu.Threshold {
+			p.putOntoTryList(pso, p.current)
 		}
 	}
-
 }
+
+func (p *Particle) putOntoTryList(pso *Pso, t Try) {
+	try := pso.fun.NewTry()
+	pso.fun.Copy(try, t)
+	p.tries = append(p.tries, try)
+	if len(p.tries) > pso.hu.NTries {
+		p.removeWorstTry(pso)
+	}
+}
+
+func (p *Particle) lookForBetterTry(pso *Pso) {
+	// if len(p.tries)>0{
+	// 	fmt.Printf("trys len = %d \n",len(p.tries))
+	// }
+	j := -1
+	betterResult := 0.0
+	for i := range p.tries {
+		result := pso.fun.Cmp(p.bestTry, p.tries[i], futil.TriesMode)
+		if result > betterResult {
+			j = i
+			betterResult = result
+		}
+	}
+	if j >= 0 && betterResult > 1.0 {
+		pso.fun.Copy(p.bestTry, p.tries[j])
+		p.tries = append(p.tries[:j], p.tries[j+1:]...)
+	}
+}
+
+func (p *Particle) removeWorstTry(pso *Pso) {
+	j := -1
+	worstResult := math.MaxFloat64
+	for i := range p.tries {
+		result := pso.fun.Cmp(p.bestTry, p.tries[i], futil.TriesMode)
+		if result < worstResult {
+			j = i
+			worstResult = result
+		}
+	}
+	if j >= 0 {
+		p.tries = append(p.tries[:j], p.tries[j+1:]...)
+	}
+}
+
 func (pso *Pso) setTempVel(z *big.Int, prob float64) {
 	for i := range pso.tempVel {
 		if z.Bit(i) > 0 {
@@ -490,7 +502,7 @@ func (pso *Pso) PUpdate() {
 		l := g.hu.Lfactor
 		l0 := g.hu.Loffset
 
-		pso.temp.Xor(p.bestParams, p.params)
+		pso.temp.Xor(p.bestTry.Parameter(), p.current.Parameter())
 		pso.BlurTarget(pso.temp, k, l, l0)
 		rp := Phi * pso.rnd.Float64()
 		if rp > 1 {
@@ -500,7 +512,8 @@ func (pso *Pso) PUpdate() {
 		pso.setTempVel(pso.temp, rp)
 		for t := range g.targets {
 			target := g.targets[t]
-			pso.temp.Xor(pso.Pt[target].bestParams, p.params)
+			pso.temp.Xor(pso.Pt[target].bestTry.Parameter(),
+				p.current.Parameter())
 			pso.BlurTarget(pso.temp, k, l, l0)
 			rg := Phi * pso.rnd.Float64()
 			if rg > 1 {
@@ -517,7 +530,7 @@ func (pso *Pso) PUpdate() {
 		}
 
 		// update parameter
-		p.hint.Set(p.params)
+		p.hint.Set(p.current.Parameter())
 		for jv := range p.vel {
 			if pso.rnd.Float64() < p.vel[jv] {
 				p.vel[jv] = 0.0
@@ -544,7 +557,6 @@ func (pso *Pso) CreateGroup(name string, ntargets int) *Group {
 	g.targets = make([]int, ntargets)
 	pso.gr[name] = g
 	g.id = name
-	g.bestCost = pso.fun.NewCostValue() // this will be over written before use
 	return g
 }
 
@@ -601,6 +613,10 @@ type PsoHeuristics struct {
 	Loffset float64
 	// for a minimum number of tries before doing something different(100)
 	TryGap int
+	//threshold for acting on a comparison(0.99)
+	Threshold float64
+	// maximum number of tries  stored in a particle(250)
+	NTries int
 }
 
 /*
@@ -613,6 +629,8 @@ func (hu *PsoHeuristics) ToDefault() {
 	hu.Lfactor = 0.15
 	hu.Loffset = 2.0
 	hu.TryGap = 100
+	hu.Threshold = 0.99
+	hu.NTries = 250
 }
 
 /*
@@ -642,6 +660,7 @@ func (pso *Pso) SetGroupHeuristics(g *Group, h *PsoHeuristics) {
 // SetGroupTarget sets the first few Targets of group 'grp'
 // to the particle list targetList.
 func (pso *Pso) SetGroupTarget(grp *Group, targetList ...int) {
+
 	copy(grp.targets, targetList)
 }
 
@@ -690,10 +709,8 @@ type CLPso struct {
 type CLpart struct {
 	// probability of learning from other particles
 	pc float64
-	// last best cost while pursuing the current target
-	lastBest futil.CostValue
-	// lastbest parameter while pursuing the current target
-	lastBestParams *big.Int
+	// last best try while pursuing the current target
+	lastBest Try
 	// failure to improve count while pursuing current target
 	gapCount int
 }
@@ -725,8 +742,7 @@ func NewCLPso(p *Pso) *CLPso {
 	for i := range pso.clPt {
 		c := &pso.clPt[i]
 		c.pc = Pc0(i, n)
-		c.lastBest = pso.fun.NewCostValue()
-		c.lastBestParams = big.NewInt(0)
+		c.lastBest = pso.fun.NewTry()
 		c.gapCount = -1 // play safe
 		gp := pso.CreateGroup(string(i), 1)
 		pso.MoveTo(gp, i)
@@ -749,35 +765,31 @@ include itself. After this it does the usual PUpdate().
 func (p *CLPso) Update() {
 	for i := range p.clPt {
 		c := &p.clPt[i]
+		p.fun.UpdateCost(c.lastBest)
 		g := p.Group(i)
+		try := p.Pt[i].current
 		if c.gapCount > p.TryGap {
 			c.gapCount = 0
+			p.fun.Copy(c.lastBest, try)
 			if p.rnd.Float64() < c.pc {
 				i1 := p.rnd.Intn(p.Nparticles())
 				i2 := p.rnd.Intn(p.Nparticles())
-				compResult := p.CleanCmp(p.LocalBestCost(i1),
-					p.LocalBestCost(i2),
-					p.LocalBestParameters(i1),
-					p.LocalBestParameters(i2))
-				if compResult < 0 {
-					p.SetGroupTarget(g, i1)
-				} else {
+				compResult := p.fun.Cmp(p.Pt[i1].bestTry, p.Pt[i2].bestTry, futil.CostMode)
+				if compResult > 0.0 {
 					p.SetGroupTarget(g, i2)
+				} else {
+					p.SetGroupTarget(g, i1)
 				}
 			} else {
 				p.SetGroupTarget(g, i)
 			}
 		} else {
-			cost := p.Pt[i].cost
-			params := p.Pt[i].params
-			if c.gapCount < 0 {
-				c.lastBest.Set(cost)
-				c.lastBestParams.Set(params)
-				c.gapCount++
-			} else if p.CleanCmp(c.lastBest, cost,
-				c.lastBestParams, params) > 0 {
-				c.lastBest.Set(cost)
-				c.lastBestParams.Set(params)
+			if c.gapCount < 0 {// needs initializing
+				p.fun.Copy(c.lastBest, try)
+				c.gapCount = p.TryGap+1
+			} else if p.fun.Cmp(c.lastBest, try, futil.CostMode) > 0.0 {
+				p.fun.Copy(c.lastBest, try)
+
 				c.gapCount = 0
 			} else {
 				c.gapCount++
@@ -808,13 +820,15 @@ func (pso *Pso) PrintDebug(w io.Writer, id string) {
 		}
 	case "group0":
 		g := pso.gr["root"]
-		fmt.Fprintf(w, "best member = %d,cost = %v \n", g.bestMember, g.bestCost)
+		fmt.Fprintf(w, "best member = %d,cost = %v \n",
+			g.bestMember, pso.Pt[g.bestMember].bestTry.Cost())
 	case "Pt":
 		for i := range pso.Pt {
 			p := &pso.Pt[i]
-			fmt.Fprintf(w, "%d bestcost= %v\n", i, p.best)
-			fmt.Fprintf(w, "bestparam = %s\n", p.bestParams.Text(2))
-			fmt.Fprintf(w, "param = %s\n", p.params.Text(2))
+			try := p.bestTry
+			fmt.Fprintf(w, "%d bestcost= %v\n", i, try.Cost())
+			fmt.Fprintf(w, "bestparam = %s\n", try.Parameter().Text(2))
+			fmt.Fprintf(w, "param = %s\n", p.current.Parameter().Text(2))
 		}
 	case "vel":
 

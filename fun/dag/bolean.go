@@ -22,8 +22,7 @@ type FunBool struct {
 	output *big.Int
 	// temporary store of cost value
 	cost *big.Int
-	// store of cost value for optimiser
-	costValue *futil.IntCostValue
+	
 
 	// temporary store of difference between output and required output
 	// cost
@@ -49,7 +48,7 @@ type OptBool interface {
 	Opt
 	// function to generate a node output l,r are the left and right inputs and opt
 	// is the encoded operation to be carried out on l,r to return the result.
-	Opt(l, r uint, opt *big.Int) uint
+	Opt(l, r uint, opt uint) uint
 }
 
 /*
@@ -85,8 +84,8 @@ func NewOpt4Bool() *Opt4Bool {
 }
 
 // Cost gives the cost of using a node
-func (o *Opt4Bool) Cost(opt *big.Int) int {
-	return o.NodeCost[int(opt.Int64())]
+func (o *Opt4Bool) Cost(opt uint) int {
+	return o.NodeCost[opt]
 }
 
 // About gives description of operation type
@@ -96,8 +95,8 @@ func (o *Opt4Bool) About() string {
 }
 
 // Decode gives a human readable discriptin of opt.
-func (o *Opt4Bool) Decode(opt *big.Int) string {
-	return o.symbol[int(opt.Int64())]
+func (o *Opt4Bool) Decode(opt uint) string {
+	return o.symbol[opt]
 }
 
 // BitSize returns Number of bits needed to store opt encoding.
@@ -108,8 +107,8 @@ func (o *Opt4Bool) BitSize() int {
 // Opt is function to generate a node output. l,r are the left and right inputs
 // and opt is the encoded operation to be carried out on l,r to return the
 // result.
-func (o *Opt4Bool) Opt(l, r uint, opt *big.Int) uint {
-	return opt.Bit(int(2*l + r))
+func (o *Opt4Bool) Opt(l, r uint, opt uint) uint {
+	return uint(1&(opt>>(2*l + r)))
 }
 
 /*
@@ -123,30 +122,47 @@ type SamplerBool interface {
 	OutputSize() int
 	About() string
 }
-
+//BoolTry gives the try structure to use
+type BoolTry = futil.IntTry
+//BoolFunStub gives interface to setpso
+type BoolFunStub = futil.IntFunStub
 // NewFunBool returns a new *FunBool ready to be used.
 func NewFunBool(nnode, nbitslookback int, opt OptBool, sizeCostFactor int64,
-	sampler SamplerBool, sampleSize int, rnd *rand.Rand) *FunBool {
+	sampler SamplerBool, sampleSize int, rnd *rand.Rand) *BoolFunStub {
 	nvar := sampler.InputSize()
 	nout := sampler.OutputSize()
+	var f FunBool
+	f.Dag = NewDag(nvar, nnode, nout, nbitslookback, opt) 
+	// temporary store of dag values
+	f.nodeValues=make([]uint, nnode)
+	//temporary store of input
+	f.input=big.NewInt(0)
+	//temporary store of output
+	f.output= big.NewInt(0)
+	// temporary store of cost value
+	f.cost= big.NewInt(0)
+	
 
-	f := FunBool{NewDag(nvar, nnode, nout, nbitslookback, opt),
-		make([]uint, nnode),
-		big.NewInt(0),
-		big.NewInt(0),
-		big.NewInt(0),
-		futil.NewIntCostValue(),
-		big.NewInt(0),
-		opt,
-		sampler,
-		big.NewInt(sizeCostFactor),
-		sampleSize,
-		rnd}
+	// temporary store of difference between output and required output
+	// cost
+	f.difCost = big.NewInt(0)
+	// node operator
+	f.opt=opt
+	// sample generator
+	f.sampler=sampler
+
+	//factor weight to include INode usage cost
+	f.sizeCostFactor= big.NewInt(0)
+	// random sample size for evaluating output missmatch cost
+	f.sampleSize =sampleSize
+	// random number generator
+	f.rnd =rnd
 
 	f.sizeCostFactor = big.NewInt(sizeCostFactor)
 	f.sampleSize = sampleSize
-	return &f
+	return futil.NewIntFunStub(&f)
 }
+
 
 // SetSizeCostFactor sets factor weight to include INode usage cost
 func (f *FunBool) SetSizeCostFactor(sizeCostFactor int64) {
@@ -167,16 +183,16 @@ where
 
 using random samples.
 */
-func (f *FunBool) Cost(x *big.Int) futil.CostValue {
-	f.Idecode(x) // assume satisfies constraints
+func (f *FunBool) Cost(data TryData, cost *big.Int){
+	d:=data.(*DTryData)
 	f.difCost.SetInt64(0)
-	f.cost.SetInt64(int64(f.structureCost))
+	cost.SetInt64(int64(d.structureCost))
 
 	for j := 0; j < f.sampleSize; j++ {
 		f.sampler.Sample(f.input, f.output, f.rnd)
 		// evaluate dag nodes using f.input from sample
-		for i := 0; i < f.usedNodes; i++ {
-			nd := &f.INodes[i]
+		for i := 0; i < d.usedNodes; i++ {
+			nd := &d.INodes[i]
 			var l uint
 			switch nd.ltype {
 			case ITypeVar:
@@ -201,19 +217,23 @@ func (f *FunBool) Cost(x *big.Int) futil.CostValue {
 		c := int64(0)
 		var cb big.Int
 		for i := 0; i < f.sampler.OutputSize(); i++ {
-			if f.nodeValues[f.outNodes[i]] != f.output.Bit(i) {
+			
+			if f.nodeValues[d.outNodes[i]] != f.output.Bit(i) {
 				c++
 			}
+			//fmt.Printf("out%d= %d,%d,%d\n",j,f.nodeValues[d.outNodes[i]],d.outNodes[i],f.output.Bit(i))
 		}
 		cb.SetInt64(c)
 		f.difCost.Add(f.difCost, &cb)
 	}
 	f.difCost.Mul(f.difCost, f.sizeCostFactor)
-	f.cost.Add(f.cost, f.difCost)
-	f.costValue.Set(f.cost)
-
-	return f.costValue
+	cost.Add(cost, f.difCost)
 }
+//DefaultParam gives a default that satisfies constraints
+func (f *FunBool) DefaultParam() *big.Int {
+	return big.NewInt(0)
+}
+
 
 // About string gives a description of the cost function
 func (f *FunBool) About() string {
@@ -224,27 +244,12 @@ func (f *FunBool) About() string {
 	return s
 }
 
-//Decode gives human radable description of encoding
-func (f *FunBool) Decode(z *big.Int) string {
-	s := f.DecodeDag(z)
-	return s
-}
 
-//ToConstraint attempts to  give a constraint satisfying hint that matches the hint;
-// pre is the previous constraint satisfying version to hint, which
-// should not be changed. It returns True if it succeeds.
-func (f *FunBool) ToConstraint(pre, hint *big.Int) bool {
-	ok := f.Idecode(hint)
-	return ok
-}
+
+
 
 // Delete hints to the function to remove/replace the ith item
 // it returns true if the function takes the hint
 func (f *FunBool) Delete(i int) bool {
 	return false
-}
-
-//NewCostValue creates zero cost value
-func (f *FunBool) NewCostValue() futil.CostValue {
-	return futil.NewIntCostValue()
 }

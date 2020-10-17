@@ -22,19 +22,20 @@ type quadFun1 struct {
 
 func (fc *quadFun1) Create(fsd int64) psokit.Fun {
 	s := quadratic.NewExSampler(10.0)
-	C := dag.NewInt2FloatRange(16, 0.0, 2.0)
-	P := dag.NewInt2FloatList(2.0, 0.5, 1.0, 0.5)
+	C := dag.NewInt2FloatRange(10, 0.5, 1.5)
+	P := dag.NewInt2FloatRange(10, 0.25, 4.0)
+	//C:=dag.NewInt2FloatList(0.5,1.0,2.0,4.0)
+	//P:=dag.NewInt2FloatList(0.5,1.0,2.0,4.0)
 	opt := dag.NewOptMorphFloat(C, P)
 	nnode := 3
 	nbitslookback := 2
-	sizeCostFactor := 0.1
-	sampleSize := 10000
+	sizeCostFactor := 1.0
+	sampleSize := 10
 	Tc := 100.0
-	sigThres := 4.0
-	bufLife := 100000
+	sigThreshold := 4.0
 	rnd := rand.New(rand.NewSource(fsd))
 	f := dag.NewFunFloat(nnode, nbitslookback, opt, sizeCostFactor,
-		s, sampleSize, rnd, Tc, sigThres, bufLife)
+		s, sampleSize, rnd, Tc, sigThreshold)
 	return f
 }
 
@@ -42,8 +43,8 @@ func main() {
 
 	var fc quadFun1
 	man := psokit.NewMan()
-	man.SetNthink(1)
-	man.SetNpart(10)
+	man.SetNthink(10)
+	man.SetNpart(20)
 	man.SetPsoCase("clpso-0")
 	man.SetFunCase("quad-10-1")
 	if err := man.AddFun("quad-10-1", "attempts to find quadratic solution formula ", &fc); err != nil {

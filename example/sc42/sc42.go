@@ -16,7 +16,7 @@ func (fc *sc42Fun1) Create(fsd int64) psokit.Fun {
 func main() {
 	var fc sc42Fun1
 	man := psokit.NewMan()
-	man.SetNthink(1200)
+	man.SetNthink(600)
 	man.SetNpart(61)
 	man.SetPsoCase("clpso-0")
 	man.SetFunCase("sumcubesfor42-1")
@@ -27,7 +27,8 @@ func main() {
 		"use-cmd-options",
 		"print-headings",
 		"print-result",
-		"plot-personal-best"); err != nil {
+		"plot-personal-best",
+		"run-progress"); err != nil {
 		fmt.Println(err)
 	}
 	man.Run()

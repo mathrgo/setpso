@@ -9,7 +9,7 @@ import (
 
 func ExampleNewOpt4Bool() {
 	o := NewOpt4Bool()
-	opt := big.NewInt(6) // code for exclusive or
+	opt := uint(6) // code for exclusive or
 	fmt.Printf("Encoding bit size: %d\n", o.BitSize())
 	fmt.Printf("Symbol:[%s]\n", o.Decode(opt))
 	fmt.Printf("Node cost: %d\n", o.Cost(opt))
@@ -41,8 +41,10 @@ func ExampleNewDag() {
 	z := big.NewInt(0)
 	fmt.Sscanf("056036016", "%x", z)
 	fmt.Printf("z: %b\n", z)
+	t:= d.CreateData()
+	d.IDecode(t,z)
 	fmt.Printf("Number of bits to encode: %d\n", d.MaxLen())
-	fmt.Printf("Dag Decode:\n %s\n", d.DecodeDag(z))
+	fmt.Printf("Dag Decode:\n %s\n", t.Decode())
 	//Output:
 }
 
@@ -61,9 +63,13 @@ func ExampleNewFunBool() {
 	z := big.NewInt(0)
 	fmt.Sscanf("056038017", "%x", z)
 	fmt.Printf("z: %b\n", z)
+	t:= f.CreateData()
+	f.IDecode(t,z)
 	fmt.Printf("Number of bits to encode: %d\n", f.MaxLen())
-	fmt.Printf("Dag Decode:\n %s\n", f.DecodeDag(z))
-	fmt.Printf("Cost: %v\n", f.Cost(z))
+	fmt.Printf("Dag Decode:\n %s\n", t.Decode())
+	cost:=big.NewInt(0)
+	f.Cost(t,cost)
+	fmt.Printf("Cost: %v\n", cost)
 	//Output:
 }
 

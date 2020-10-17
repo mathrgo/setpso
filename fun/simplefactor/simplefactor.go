@@ -19,31 +19,41 @@ type Fun struct {
 	pq   *big.Int
 	p    *big.Int
 	q    *big.Int
-	cost futil.CostValue
 }
 
-//NewCostValue creates a zero cost value representing a
-// big integer.
-func (f *Fun) NewCostValue() futil.CostValue {
-	return futil.NewIntCostValue()
+//Try is the try interface used by setpso
+type Try = setpso.Try
+
+//FunTry gives the try structure to use
+type FunTry = futil.IntTry
+
+//TryData is the interface for FunTryData used in package futil
+type TryData = futil.TryData
+
+//FunTryData is the decoded data structure for a try
+type FunTryData struct {
+	p, q, c *big.Int
 }
 
-// MaxLen returns the number of elements in the subset sum problem
-func (f *Fun) MaxLen() int {
-	return f.Nbit
+//IDecode decodes z into d
+func (f *Fun) IDecode(data TryData, z *big.Int) {
+	d := data.(*FunTryData)
+	d.p.Set(z)
+	d.q.DivMod(f.pq, d.p, d.c)
 }
 
-//Cost returns the remainder after dividing p in to the prime product
-func (f *Fun) Cost(p *big.Int) futil.CostValue {
-	var c, q big.Int
-	q.DivMod(f.pq, p, &c)
-	f.cost.Set(&c)
-	return f.cost
+// Decode requests the function to give a meaningful interpretation of
+// p as a Parameters subset for the function assuming p satisfies constraints
+func (d *FunTryData) Decode() string {
+	return fmt.Sprintf("p=%v \nq=%v", d.p, d.q)
 }
+
+//IntFunStub gives interface to setpso
+type IntFunStub = futil.IntFunStub
 
 // New creates a new function where p and q are the two prime components
-// that make up the integer to be factorised
-func New(p, q *big.Int) *Fun {
+// that make up the integer to be factorized
+func New(p, q *big.Int) *IntFunStub {
 	var f Fun
 	f.pq = big.NewInt(0)
 	f.p = big.NewInt(0)
@@ -52,33 +62,45 @@ func New(p, q *big.Int) *Fun {
 	f.q.Set(q)
 	f.pq.Mul(p, q)
 	f.Nbit = p.BitLen()
-	f.cost = f.NewCostValue()
-	return &f
+
+	return futil.NewIntFunStub(&f)
 }
 
-/*Creator is used by psokit to create instances of Fun through its interface
-method Create().
-*/
-type Creator struct {
-	p, q *big.Int
+//CreateData creates a empty structure for decoded try
+func (f *Fun) CreateData() TryData {
+	t := new(FunTryData)
+	t.p = new(big.Int)
+	t.q = new(big.Int)
+	t.c = new(big.Int)
+	return t
 }
 
-// NewCreator just returns a Creator of Fun with primes p,q.
-func NewCreator(p, q *big.Int) *Creator {
-	c := Creator{p, q}
-	return &c
+//Cost returns the remainder after dividing p in to the prime product
+func (f *Fun) Cost(data TryData, cost *big.Int) {
+	cost.Set(data.(*FunTryData).c)
 }
 
-// Create creates an instance
-func (c *Creator) Create(sd int64) setpso.Fun {
-	return New(c.p, c.q)
+//DefaultParam gives a default that satisfies constraints
+func (f *Fun) DefaultParam() *big.Int {
+	return big.NewInt(2001)
 }
 
-// ToConstraint uses the previous parameter pre and the updating hint parameter
-// to attempt to produce an update to hint which satisfies solution constraints
-// and returns valid = True if succeeds. It returns false if the hint is less
-// than or equal to 2000 and converts an even hint to an odd hint
-func (f *Fun) ToConstraint(pre, hint *big.Int) (valid bool) {
+//CopyData copies src to dest
+func (f *Fun) CopyData(dest, src TryData) {
+	s := src.(*FunTryData)
+	d := dest.(*FunTryData)
+	d.p.Set(s.p)
+	d.q.Set(s.q)
+	d.c.Set(s.c)
+}
+
+// MaxLen returns the number of elements in the subset sum problem
+func (f *Fun) MaxLen() int {
+	return f.Nbit
+}
+
+//Constraint attempts to constrain hint possibly using a copy of pre to do this
+func (f *Fun) Constraint(pre TryData, hint *big.Int) (valid bool) {
 	if hint.Cmp(big.NewInt(2000)) > 0 {
 		valid = true
 		if hint.Bit(0) == 0 {
@@ -101,13 +123,23 @@ func (f *Fun) About() string {
 	return s
 }
 
-// Decode requests the function to give a meaningful interpretation of
-// p as a Parameters subset for the function assuming p satisfies constraints
-func (f *Fun) Decode(p *big.Int) (s string) {
-	var c, q big.Int
-	q.DivMod(f.pq, p, &c)
-	return fmt.Sprintf("p=%v \nq=%v", p, &q)
-}
-
 // Delete hints to the function to remove/replace the ith item
 func (f *Fun) Delete(i int) bool { return false }
+
+/*Creator is used by psokit to create instances of Fun through its interface
+method Create().
+*/
+type Creator struct {
+	p, q *big.Int
+}
+
+// NewCreator just returns a Creator of Fun with primes p,q.
+func NewCreator(p, q *big.Int) *Creator {
+	c := Creator{p, q}
+	return &c
+}
+
+// Create creates an instance
+func (c *Creator) Create(sd int64) setpso.Fun {
+	return New(c.p, c.q)
+}

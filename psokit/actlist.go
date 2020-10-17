@@ -3,6 +3,7 @@ package psokit
 import (
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"sort"
 
@@ -103,10 +104,11 @@ type Printresult struct{}
 //Result just prints  the run result as cost and decoded subset
 func (a *Printresult) Result(man *ManPso) {
 	p := man.P()
-	f := man.F()
+	try := p.Part(p.BestParticle()).BestTry()
 	fmt.Printf("RUN %d:\n", man.RunID())
-	fmt.Printf(" Cost: %s\n", p.GlobalCost())
-	fmt.Printf("%s\n", f.Decode(p.GlobalParams()))
+	fmt.Printf(" Best Particle: %d\n", p.BestParticle())
+	fmt.Printf(" Cost: %s\n", try.Cost())
+	fmt.Printf("%s\n", try.Decode())
 }
 
 /*
@@ -136,7 +138,7 @@ type RunProgress struct {
 	progress int
 }
 
-//RunInit initialises the progres counter
+//RunInit initializes the progres counter
 func (a *RunProgress) RunInit(man *ManPso) {
 	a.progress = 0
 }
@@ -183,6 +185,34 @@ func (r *ResultsArray) ResUpdate(val float64, dataID, valID, iterID int) {
 	r1[dataID].Y = val
 }
 
+//FixLinAxis attempts to give better min/max bounds for linear axis
+func FixLinAxis(a *plot.Axis) {
+
+	d := a.Max - a.Min
+	if d > 0 {
+		scale := math.Pow(10.0, math.Ceil(math.Log10(d)))
+		min1 := math.Floor(a.Min/scale) * scale
+		rMin := []float64{0.1, 0.2, 0.4, 0.5, 1, 1.2}
+		min := min1
+		for i := range rMin {
+			if s := min1 + scale*rMin[i]; s <= a.Min {
+				min = s
+			}
+
+		}
+		rMax := []float64{2.0, 1.0, 0.5, 0.2, 0.1}
+		max := min
+		for i := range rMax {
+			if s := min + scale*rMax[i]; s >= a.Max {
+				max = s
+			}
+		}
+		//fmt.Printf("min=%f max=%f scale=%f min1= %f \n", a.Min, a.Max, scale, min1)
+		a.Max = max
+		a.Min = min
+	}
+}
+
 /*
 NewPlot creates a basic plot. yaxisname is the Y-axis label; title is the plot title;
 runid is the run ID.
@@ -206,6 +236,14 @@ func (r *ResultsArray) NewPlot(yaxisname, title string, runid int) {
 	pl1.Title.Text = fmt.Sprintf("%s of particle: Run %d", title, runid)
 	pl1.X.Label.Text = "iteration"
 	pl1.Y.Label.Text = yaxisname
+	FixLinAxis(&(pl1.Y))
+	// use Log scale on iterations
+
+	//fmt.Printf(" X min = %f \t X max= %f\n", pl1.X.Min, pl1.X.Max)
+	//fmt.Printf(" Y min = %f \t Y max= %f\n", pl1.Y.Min, pl1.Y.Max)
+	//pl1.X.Min = 10.0
+	pl1.X.Scale = plot.LogScale{}
+	pl1.X.Tick.Marker = plot.LogTicks{}
 	// Save the plot to a PNG file.
 	filename := fmt.Sprintf("plot%s%d.pdf", yaxisname, runid)
 	if errx1 := pl1.Save(4*vg.Inch, 4*vg.Inch, filename); errx1 != nil {
@@ -229,7 +267,7 @@ func (pl *PlotPersonalBest) RunInit(man *ManPso) {
 func (pl *PlotPersonalBest) DataUpdate(man *ManPso) {
 	p := man.P()
 	for j := 0; j < man.Npart(); j++ {
-		pl.ResUpdate(p.LocalBestCost(j).Fbits(), man.Diter(), j, man.Iter())
+		pl.ResUpdate(p.Part(j).BestTry().Fbits(), man.Diter(), j, man.Iter())
 	}
 }
 
@@ -253,11 +291,11 @@ type CmdOptions struct{}
 //Init reads the command options.
 func (cmd *CmdOptions) Init(man *ManPso) {
 	var optCase, funCase string
-	var dbug, listFun, listPso, listAct bool
+	var debug, listFun, listPso, listAct bool
 	var stopAt, nrun, npart int
 	flag.StringVar(&optCase, "pso", man.PsoCase(), "name of PSO")
 	flag.StringVar(&funCase, "fun", man.FunCase(), "name of function to optimise")
-	flag.BoolVar(&dbug, "dump", man.DebugDump(), "set to true when debug dumping")
+	flag.BoolVar(&debug, "dump", man.DebugDump(), "set to true when debug dumping")
 	flag.IntVar(&stopAt, "dbstop", man.StopAt(), "cycle to stop at when doing a debug dump")
 	flag.IntVar(&nrun, "nrun", man.Nrun(), "number of independent runs when not debug dumping")
 	flag.IntVar(&npart, "npart", man.Npart(), "number of independent runs when not debug dumping")
@@ -284,7 +322,7 @@ func (cmd *CmdOptions) Init(man *ManPso) {
 	man.SetNrun(nrun)
 	man.SetNpart(npart)
 
-	if dbug {
+	if debug {
 		man.SetDebugDump(true)
 		man.SetStopAt(stopAt)
 		man.SetNrun(1)
