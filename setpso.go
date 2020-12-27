@@ -113,9 +113,9 @@ type PsoInterface interface {
 	// interface for requesting debug output based on cmd
 	PrintDebug(w io.Writer, cmd string)
 	//Heuristics returns a copy of the master heuristics
-	Heuristics() PsoHeuristics
+	Heuristics() *PsoHeuristics
 	//SetHeuristics sets the heuristics for the particle swarm.
-	SetHeuristics(hu PsoHeuristics)
+	SetHeuristics(hu *PsoHeuristics)
 }
 
 // Particle is the state of a member of the PSO
@@ -184,10 +184,10 @@ type Pso struct {
 	// number of particles
 	n int
 	// heuristics for the groups to derive from
-	hu PsoHeuristics
+	hu *PsoHeuristics
 }
 
-/*NominalL returns a nominal Lfactor value for  the heuristic HLfactor based on
+/*NominalL returns a nominal LfactorHeuristic value for  the LfactorHeuristic based on
 * Number of particles and number of parameters. This was tuned for the
 * continuous case this needs tuning for  the discrete  set case and is not yet
 * used.
@@ -216,7 +216,6 @@ func NewPso(n int, fun Fun,
 	var pso Pso
 	pso.rnd = rand.New(rand.NewSource(sd))
 	pso.n = n
-	pso.hu.ToDefault()
 	pso.maxLen = fun.MaxLen()
 	pso.fun = fun
 	pso.temp = big.NewInt(0)
@@ -225,8 +224,8 @@ func NewPso(n int, fun Fun,
 	g := new(Group)
 	pso.gr["root"] = g
 	g.id = "root"
-
-	pso.SetGroupHeuristics(g, &pso.hu)
+	pso.hu = pso.CreatePsoHeuristics()
+	pso.SetGroupHeuristics(g, pso.hu)
 	g.members = make([]int, n)
 
 	g.targets = make([]int, 1, 2)
@@ -330,7 +329,7 @@ func (pso *Pso) LocalBestTry(i int) Try {
 }
 
 //Heuristics returns a copy of the master heuristics
-func (pso *Pso) Heuristics() PsoHeuristics { return pso.hu }
+func (pso *Pso) Heuristics() *PsoHeuristics { return pso.hu }
 
 // CardinalSize returns the number of 1's in a binary representation of Int
 // (assuming it is positive) so is the cardinal size of the corresponding set.
@@ -352,7 +351,7 @@ Parameters. The blur is effected indirectly  by pseudo adding a probability
 
   pb =rand*(l*CardinalSize(x)+l0)/MaxLen()
 
-to each component of the Velocity;l,l0 corresponds to the Lfactor, Loffset
+to each component of the Velocity;l,l0 corresponds to the LfactorHeuristic, LoffsetHeuristic
 heuristics;MaxLen() is the maximum number of set items ;rand is a random number
 between 0 and 1.
 */
@@ -389,7 +388,7 @@ func (pso *Pso) SetParams(id int) {
 		compResult := pso.fun.Cmp(p.bestTry, p.current, futil.CostMode)
 		//fmt.Printf("compResult = %f \n", compResult)
 
-		if compResult > pso.hu.Threshold {
+		if compResult > pso.hu.Float(ThresholdHeuristic) {
 			//p.putOntoTryList(pso, p.bestTry)
 			pso.fun.Copy(p.bestTry, p.current)
 			//fmt.Printf("part= %d  %s %s \n", id, p.bestTry.Decode(), p.bestTry.Cost())
@@ -401,7 +400,7 @@ func (pso *Pso) SetParams(id int) {
 
 			//}
 
-		} else if compResult > -pso.hu.Threshold {
+		} else if compResult > -pso.hu.Float(ThresholdHeuristic) {
 			p.putOntoTryList(pso, p.current)
 		}
 	}
@@ -411,7 +410,7 @@ func (p *Particle) putOntoTryList(pso *Pso, t Try) {
 	try := pso.fun.NewTry()
 	pso.fun.Copy(try, t)
 	p.tries = append(p.tries, try)
-	if len(p.tries) > pso.hu.NTries {
+	if len(p.tries) > pso.hu.Int(NTriesHeuristic) {
 		p.removeWorstTry(pso)
 	}
 }
@@ -481,10 +480,10 @@ the appropriate targets and heuristics.
 for each Particle  the Parameters difference between itself Personal-best and
 Targets is represented by taking the exclusive or of the corresponding
 Parameters as subset. This is then used to pseudo add up contributions to target
-blur prior to reducing the velocity  by a factor equal to the Omega heuristic.
+blur prior to reducing the velocity  by a factor equal to the OmegaHeuristic heuristic.
 
-Then the Phi heuristic is used to generate randomly chosen parameters r
-for each exclusive or between 0 and Phi; each r is checked to be <= 1.0 and is
+Then the PhiHeuristic is used to generate randomly chosen parameters r
+for each exclusive or between 0 and PhiHeuristic; each r is checked to be <= 1.0 and is
 forced  to be so by replacing by 2-r if it isn't. These r are then pseudo added
 to the  the velocity components that have an exclusive or bit of 1.
 
@@ -498,13 +497,13 @@ func (pso *Pso) PUpdate() {
 	for k := range pso.Pt {
 		p := &pso.Pt[k]
 		g := p.group
-		Phi := g.hu.Phi
-		l := g.hu.Lfactor
-		l0 := g.hu.Loffset
+		PhiHeuristic := g.hu.Float(PhiHeuristic)
+		l := g.hu.Float(LfactorHeuristic)
+		l0 := g.hu.Float(LoffsetHeuristic)
 
 		pso.temp.Xor(p.bestTry.Parameter(), p.current.Parameter())
 		pso.BlurTarget(pso.temp, k, l, l0)
-		rp := Phi * pso.rnd.Float64()
+		rp := PhiHeuristic * pso.rnd.Float64()
 		if rp > 1 {
 			rp = 2 - rp
 		}
@@ -515,7 +514,7 @@ func (pso *Pso) PUpdate() {
 			pso.temp.Xor(pso.Pt[target].bestTry.Parameter(),
 				p.current.Parameter())
 			pso.BlurTarget(pso.temp, k, l, l0)
-			rg := Phi * pso.rnd.Float64()
+			rg := PhiHeuristic * pso.rnd.Float64()
 			if rg > 1 {
 				rg = 2 - rg
 			}
@@ -523,9 +522,9 @@ func (pso *Pso) PUpdate() {
 			pso.addToTempVel(pso.temp, rg)
 		}
 		//reduce velocity and then combine contributions
-		Omega := g.hu.Omega
+		OmegaHeuristic := g.hu.Float(OmegaHeuristic)
 		for jv := range p.vel {
-			p.vel[jv] *= Omega
+			p.vel[jv] *= OmegaHeuristic
 			p.vel[jv] = (1.0-pso.tempVel[jv])*p.vel[jv] + pso.tempVel[jv]
 		}
 
@@ -603,34 +602,79 @@ shared between groups so it is important to know where this is done when
 updating a group's  heuristics.
 */
 type PsoHeuristics struct {
-	//for target shooting probability range (1.0 )
-	Phi float64
-	//for probability velocity factoring after target blur (0.73)
-	Omega float64
-	// for target blur factor (0.15)
-	Lfactor float64
-	// for target blur offset (2.0)
-	Loffset float64
-	// for a minimum number of tries before doing something different(100)
-	TryGap int
-	//threshold for acting on a comparison(0.99)
-	Threshold float64
-	// maximum number of tries  stored in a particle(250)
-	NTries int
+	// storage of float values
+	floatValues []float64
+	// storage of int values
+	intValues []int
+}
+
+/*
+CreatePsoHeuristics returns a pointer to a SPSO heuristics parameters with
+default values. pso is used to pass SPSO instance parameters such as number of particles and the initial number of elements in the parameter set to help provide tuned heuristics.
+*/
+func (pso *Pso) CreatePsoHeuristics() *PsoHeuristics {
+	hu := new(PsoHeuristics)
+	hu.floatValues = make([]float64, numberOfFloatHeuristics)
+	hu.intValues = make([]int, numberOfIntHeuristics)
+	hu.ToDefault(pso)
+	return hu
 }
 
 /*
 ToDefault sets the heuristics to their default value. Note this may change
-in future when better defaults are found.
+in future when better defaults are found. pso is used to pass SPSO parameters.
 */
-func (hu *PsoHeuristics) ToDefault() {
-	hu.Phi = 1
-	hu.Omega = 0.73
-	hu.Lfactor = 0.15
-	hu.Loffset = 2.0
-	hu.TryGap = 100
-	hu.Threshold = 0.99
-	hu.NTries = 250
+func (hu *PsoHeuristics) ToDefault(pso *Pso) {
+	hu.SetFloat(PhiHeuristic, 1)
+	hu.SetFloat(OmegaHeuristic, 0.73)
+	hu.SetFloat(LfactorHeuristic, 0.15)
+	hu.SetFloat(LoffsetHeuristic, 2.0)
+	hu.SetFloat(ThresholdHeuristic, 0.99)
+	hu.SetInt(NTriesHeuristic, 250)
+
+	hu.SetInt(TryGapHeuristic, 100)
+}
+
+const ( // floating  point  heuristics indexes
+	//PhiHeuristic for target shooting probability range (1.0 )
+	PhiHeuristic = iota
+	//OmegaHeuristic for probability velocity factoring after target blur (0.73)
+	OmegaHeuristic = iota
+	//LfactorHeuristic for target blur factor (0.15)
+	LfactorHeuristic = iota
+	//LoffsetHeuristic for target blur offset (2.0)
+	LoffsetHeuristic = iota
+	//ThresholdHeuristic for acting on a comparison(0.99)
+	ThresholdHeuristic      = iota
+	numberOfFloatHeuristics = iota
+)
+
+const ( //integer heuristics indexes
+	//NTriesHeuristic for  maximum number of tries  stored in a particle(250)
+	NTriesHeuristic = iota
+	//TryGapHeuristic for a minimum number of tries before doing something different(100)
+	TryGapHeuristic       = iota
+	numberOfIntHeuristics = iota
+)
+
+// Float returns the ith floating point heuristic
+func (hu *PsoHeuristics) Float(i int) float64 {
+	return hu.floatValues[i]
+}
+
+// SetFloat sets the ith floating point heuristic to x
+func (hu *PsoHeuristics) SetFloat(i int, x float64) {
+	hu.floatValues[i] = x
+}
+
+// Int returns the ith floating point heuristic
+func (hu *PsoHeuristics) Int(i int) int {
+	return hu.intValues[i]
+}
+
+// SetInt sets the ith integer heuristic to x
+func (hu *PsoHeuristics) SetInt(i, x int) {
+	hu.intValues[i] = x
 }
 
 /*
@@ -683,7 +727,7 @@ func NewGPso(p *Pso) *GPso {
 }
 
 //SetHeuristics sets the heuristics for the particle swarm.
-func (p *GPso) SetHeuristics(hu PsoHeuristics) { p.hu = hu }
+func (p *GPso) SetHeuristics(hu *PsoHeuristics) { p.hu = hu }
 
 // Update sets the target to the current global best  Particle before updating
 // the particle swarm
@@ -729,7 +773,7 @@ func Pc0(i int, n float64) float64 {
 
 /*
 NewCLPso creates a CLPso and sets the heuristics if required. In this case
-TryGap heuristic is the number of iterations with no improvement needed to
+TryGapHeuristic is the number of iterations with no improvement needed to
 trigger the probabilistic search for an alternative target. The ith particle is
 assigned the probability Pc0(i,n)  to look for an alternative target when
 triggered, where n is the number of particles.
@@ -738,7 +782,7 @@ func NewCLPso(p *Pso) *CLPso {
 	clpt := make([]CLpart, p.Nparticles())
 	pso := &CLPso{p, clpt, 0}
 	n := float64(pso.Nparticles())
-	pso.TryGap = pso.hu.TryGap
+	pso.TryGap = pso.hu.Int(TryGapHeuristic)
 	for i := range pso.clPt {
 		c := &pso.clPt[i]
 		c.pc = Pc0(i, n)
@@ -751,7 +795,7 @@ func NewCLPso(p *Pso) *CLPso {
 }
 
 //SetHeuristics sets the heuristics for the particle swarm.
-func (p *CLPso) SetHeuristics(hu PsoHeuristics) { p.hu = hu }
+func (p *CLPso) SetHeuristics(hu *PsoHeuristics) { p.hu = hu }
 
 /*
 Update does the iteration update. For each Particle a check is made to see if
@@ -784,9 +828,9 @@ func (p *CLPso) Update() {
 				p.SetGroupTarget(g, i)
 			}
 		} else {
-			if c.gapCount < 0 {// needs initializing
+			if c.gapCount < 0 { // needs initializing
 				p.fun.Copy(c.lastBest, try)
-				c.gapCount = p.TryGap+1
+				c.gapCount = p.TryGap + 1
 			} else if p.fun.Cmp(c.lastBest, try, futil.CostMode) > 0.0 {
 				p.fun.Copy(c.lastBest, try)
 

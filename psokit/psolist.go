@@ -60,7 +60,7 @@ func (man *ManPso) CreatePso(name string) (p PsoInterface) {
 
 /*
 loadPsoDescription loads the description of the installed PSO instance.
-this is done during the initialisation of man in New().
+this is done during the initialization of man in New().
 */
 func (man *ManPso) loadPsoDescription() {
 
@@ -70,7 +70,7 @@ func (man *ManPso) loadPsoDescription() {
 }
 
 /*
-PsoDescription gives a description of SPSOs by name.
+PsoDescription gives a description of SPSO by name.
 */
 func (man *ManPso) PsoDescription() string {
 	keys := make([]string, len(man.psod))

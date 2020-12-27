@@ -101,7 +101,7 @@ For the moment we restrict the SPSO state to be at most $N$ bits\footnote{Intern
 
 \subsection{Heuristics}
 
-SPSO has a collection of heuristics for tuning the optimiser they are :
+SPSO has a collection of heuristics for tuning the optimiser they are:\footnote{in the code  heuristic is accessed by a constant index into an array of appropriate type. Each index has a name of the form $<$heuristic name$>$Heuristic as away of accessing individual heurisci of that name.  } 
 
 \begin{tabular}{|c|c|c|p{6cm}|}\hline	
 	Name& Type &Value& Comment\\
@@ -110,7 +110,7 @@ SPSO has a collection of heuristics for tuning the optimiser they are :
 	\texttt{Omega}& float64&0.73&probability velocity factoring after target blur.\\
    \texttt{Lfactor}& float64&0.15&target shotgun blurring factor. \\
 	\texttt{Loffset}& float64&2.0& target residual blur.\\
-	\texttt{TryGap}& in&100&used by the SPSO \texttt{CLPso} to give minimum 
+	\texttt{TryGap}& int&100&used by the SPSO \texttt{CLPso} to give minimum 
 	number of tries before doing something different.\\
 	\texttt{Threshold}& float64&0.99& threshold for acting on a comparison.\\
 	\texttt{NTries}& int&250&maximum number of un committed competing Tries  stored in a particle.\\

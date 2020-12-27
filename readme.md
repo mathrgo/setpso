@@ -93,7 +93,7 @@ best cost has to be  re-evaluated from time to time. This could for instance
 include the Cost-function replacing a set item  that is never used to give a low
 cost by another item that was not in the original set of items which may
 result in improved cost resulting in changing the items properties. As part of this
-The number of set elements should be allowed to change from time to time. 
+The number of set elements should be allowed to change from time to time.
 At the moment this is partially supported through repeated evaluation of costs with
 one cost type that supports averaging costs for a given parameter with a forgetting
 time constant.
@@ -113,11 +113,11 @@ golang is a Google programming language that appears to be suited for developing
 SPSOs. ensure you have a copy by going to [golang](https://golang.org) and down
 loading it.
 
-Sofware is developed using Visual Studio Code at <https://code.visualstudio.com>  which is the preferred IDE.
+Software is developed using Visual Studio Code at <https://code.visualstudio.com>  which is the preferred IDE.
 
-The following instructions are for quickly getting a working example using a command line at a terminal: 
+The following instructions are for quickly getting a working example using a command line at a terminal:
 
-Open a terminal and clone get this package to your computer by going to an empty directory and typing 
+Open a terminal and clone get this package to your computer by going to an empty directory and typing
 
     git clone https://github.com/mathrgo/setpso .
 
@@ -145,6 +145,5 @@ For background information and some insight into the algorithms read <https://gi
 Code derived documentation is given in <https://godoc.org/github.com/mathrgo/setpso> .
 
 This documentation is hierarchical in nature giving information on each package and is worth reading to understand the packages starting with setpso.
- 
-follow the instructions and example for running GPso and CLPso .
 
+follow the instructions and example for running GPso and CLPso .
