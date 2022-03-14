@@ -15,12 +15,14 @@ import (
 )
 
 func main() {
-	var p, q big.Int
+	var p, q, pMin big.Int
 	// put in the two prime factors  to test against
 	p.SetString("1059652519", 0)
 	q.SetString("929636291", 0)
+	// choose smallest factor to use
+	pMin.SetString("50000000",0)
 	// use convenience  creator function
-	fc := simplefactor.NewCreator(&p, &q)
+	fc := simplefactor.NewCreator(&p, &q, &pMin)
 	// create a run manager
 	man := psokit.NewMan()
 	// set number of iterations between each data output

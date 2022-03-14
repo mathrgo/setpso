@@ -61,7 +61,7 @@ the binary representation can be regarded as an encoding of algorithms or anythi
 For  Machine Learning there is a need to extend the basic SPSO to cope with:
 \begin{enumerate}
 	\item noisy data mainly due to a restricted amount of available data when evaluating a cost-function. 
-	\item represent continuous state such as design or neural net parameters by a set of discrete values some what similar to the way genetic algorithms deal with this by digitizing the continuous case.
+	\item represent continuous state such as design of neural net parameters by a set of discrete values some what similar to the way genetic algorithms deal with this by digitizing the continuous case.
 	\item treat random strings of bits as a way of generating useful programs  to find optimising solutions which in turn can be used as a way of tuning meta parameters.
 	\item Acknowledge need to avoid over fitting and that only approximate solutions are needed. 
 \end{enumerate}  
@@ -323,7 +323,7 @@ So $P_s(i) $ chooses the particle with personal best that gives a better cost re
 GPso was the first complete SPSO coded up where all particles belong to one Group and Group target is the particle with best personal best. This  is the same choice of target as proposed for the original continuous  PSO in \cite{KE-pso}; it often gives more rapid convergence but is more easily stuck at a local minimum which is far from optimal. 
 
 \chapter{Cost Function Factory}
-\section{Cost Function interface with SPSO}
+\section{Cost Function interface with SPSO \label{sec:cost_fun_Interface_SPSO}} 
 Cost function links up with a SPSO through a \emph{golang interface }called \texttt{Fun}  in \codesorc{setpso.go}. The interface is as follows: 
 
 \begin{description}
@@ -428,10 +428,10 @@ Try Data  with interface \texttt{TryData } is used to store useful  variables va
 	\item[Decode() \texttt{string}] this gives a human readable description of the data.
 \end{description}
  
-As will be shown in Section \ref{sec:Stubs} the main interface  that has to be coded up for each Cost Function only needs to explicitly deal with the Try Data part of a Try and choice of standard stub to represent the type of cost being used by the Cost Function thus reducing the overhead of writing one.
+As will be shown in Section \ref{sec:Stubs} the main interface  that has to be coded up for each Cost Function only needs to explicitly deal with the Try Data part of a Try and choice of standard stub to represent type of cost being used by the Cost Function thus reducing the overhead of writing one.
 
 \section{Try Data Centric Cost Function and the Use of Stubs \label{sec:Stubs}}
-the Cost Function interface given in operates at the level of Tries. Implementing this interface results in a lot of common code that only depends on the type of cost used by the Cost Function, while most of the operations specific to a Cost Function implementation involves manipulating Try Data; because of this the software supplies Cost Function stubs for each cost type that takes a Try Data manipulation cost function with the following interface in \codesorc{fun/futil/futil.go} :
+the Cost Function interface given in \ref{sec:cost_fun_Interface_SPSO} operates at the level of Tries. Implementing this interface results in a lot of common code that only depends on the type of cost used by the Cost Function, while most of the operations specific to a Cost Function implementation involves manipulating Try Data; because of this the software supplies Cost Function stubs for each cost type that takes a Try Data manipulation cost function with the following interface in \codesorc{fun/futil/futil.go} :
 \begin{description}
 	\item[CreateData() \texttt{TryData}] creates an empty try data store for the decoded part of the try.
 	\item[DefaultParam() \texttt{*big.Int}]  returns a default parameter which should satisfy constraints.
@@ -536,9 +536,37 @@ code is in \codesorc{fun/futil/int.go}, and corresponding Try type is \texttt{In
 \subsubsection{Using Big Integer}
 Big integer cost values are used to include some of the difficult cases in combinatorial optimisation, although the chance of finding global best solutions to these problems is minimal; however, The algorithms are expected to produce good useful approximations to these hard problems; I would like to suggest that main area of application is \emph{machine learning where one is interested in good approximate minimisation solutions of difficult problems}.
 
+\chapter{Toolkit and its Use}
+
+when generating optimisation and cost function cases followed by running them to generate various standard outputs the process often follows the same pattern and somewhat repetitive generation of code. The idea is to embed these process in a flexible toolkit that does most of the work for you, and has sufficient flexibility to enable customisation of processes. The toolkit resides in \codesorc{psokit}.
+Examples of using it are given in subdirectories of \codesorc{example}. 
+
+The Hello World  example is in the subdirectory
+\texttt{runkit1} which uses a default function and optimiser. This however hides most of the setup procedure by using defaults and the seed is for the 4th run that gives an exact result for a subset sum problem that is close to being intractable with a target value of 18,498,885  and 100 elements, but does this in about 20 seconds on an iMac thus showing the potential for solving difficult problems. 
+
+A more instructive example as far as setting up runs using \texttt{psokit}  is in the subdirectory \texttt{runkit2} it attempts to factorise the number 985091437511967029 into its prime components 1059652519 and 929636291 using a naive method of dividing the composite number by a trial positive integer  greater than 50000000 but less than 32  bits long with  remainder as the cost. Needless to say the factorisation is never found, but interestingly enough it reduces the remainder to 6 by 5th run. each run takes about 12 seconds; showing that it can quickly find good approximate answers.  The  code for \texttt{runkit2.go} is  given in Figure \ref{fig:runkit2go}.
 
 
+\begin{figure}
+	\centering
+	\includegraphics[width=1.2\linewidth]{runkit2_go}
+	\caption{\texttt{runkit2.go} Code}
+	\label{fig:runkit2go}
+\end{figure}
 
+In the code  cost function to be optimised, as declared on line 13, is in
+\codesorc{fun/simplefactor}. $p,q$ correspond to the two prime factors to set up the problem and $pMin$ is the minimum value of the factor to test; this ensures that the remainder after factorising is on average large and thus can be used as a cost value. During optimisation the cost function works with the product $n = pq$ so given a trial factor $t$ the cost is $n\; \mathrm{mod}\; t$.    
+
+The toolkit can do a sequence of runs and creates a new instance of the optimiser and cost function for each run using different but computed random noise seeds thus making each run independent. To do this it needs a cost function creator  that creates a new instance  when called with a random number seed argument.  in this example \texttt{simplefactor }does this at line 25. at line 27 an instance of the toolkit is created. This instance , \texttt{man}, has lots of defaults which can be over written before  being executed by calling 
+\texttt{man.Run()} at line 52. 
+
+The amount of data produced during each iteration can swamp any attempt to analyse  with hundreds of thousands of iterations per run so by default only 1200 iterations are monitored during a run \texttt{SetNthink()} changes the number of iterations from one data output to the next which in this case is set to 120 at line 29.  At line 31 number of optimising particles is set to 61. At line 13 seed of the random number generator of the SetPSO optimiser is set to a linear function of  run number where the first argument is offset and the second argument is gain of the linear function. 
+
+The toolkit uses names of components to use in the form of strings. \texttt{clpso-0} at line 35 is a built in SetPSO optimiser using comprehensive learning and is an instance of  \texttt{setpso.NewCLPso}. In line 37 the name of cost function to use is set to \texttt{primeFactoring-1} note at this point such a cost function does not exist so on line 39 it is registered to \texttt{man} using a short description and creator \texttt{fc}. at this point   uniqueness of the function name in the list of known  named cost  functions is checked.
+
+the toolkit can carry out actions while executing \texttt{man.Run()}. in the example a list of actions is selected at line 43. These are built in named actions with descriptive names. \texttt{use-cmd-options} enables the use of command options to configure running man from the command-line and is usually used when run, in this case\texttt{ runkit2.go}, from a terminal. with this action if there is no command options on the command-line the program outputs a list of commands  with a short description. To execute a single  run  use the command option \texttt{-nrun 1}, if you intend to do a batch of runs then replace 1 by the number of runs. \texttt{print-headings} prints a setup and run heading. \texttt{print-result} gives the result of doing an optimisation run. \texttt{plot-personal-best} generates a plot of the evolution of personal best cost using a Fbits representation of cost which is a signed log base 2 of the cost that is linear near cost of zero. the plot is stored in \texttt{plotFbits(cost)}$n$\texttt{.pdf} for optimisation run $n$.  \texttt{run-progress }outputs a digit from 1 to 9 in sequence every time the run does  another tenth of the run providing an indication of run progress.   
+
+The named components can be selected by name and additional ones can be registered and added to the list of available components  as and when needed. SetPSO versions are registered using \texttt{man.AddPso()} and actions with \texttt{man.AddAct()} in a similar way to adding and registering  cost functions using \texttt{man.AddFun()}. 
 
 
 

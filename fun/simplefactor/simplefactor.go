@@ -19,6 +19,7 @@ type Fun struct {
 	pq   *big.Int
 	p    *big.Int
 	q    *big.Int
+	pMin *big.Int
 }
 
 //Try is the try interface used by setpso
@@ -52,16 +53,21 @@ func (d *FunTryData) Decode() string {
 type IntFunStub = futil.IntFunStub
 
 // New creates a new function where p and q are the two prime components
-// that make up the integer to be factorized
-func New(p, q *big.Int) *IntFunStub {
+// that make up the integer to be factorized. pMin is the smallest factor
+// to choose
+func New(p, q, pMin *big.Int ) *IntFunStub {
 	var f Fun
 	f.pq = big.NewInt(0)
 	f.p = big.NewInt(0)
+	f.pMin = big.NewInt(0)
 	f.p.Set(p)
+	f.pMin.Set(pMin)
 	f.q = big.NewInt(0)
 	f.q.Set(q)
 	f.pq.Mul(p, q)
-	f.Nbit = p.BitLen()
+	s:=big.NewInt(0)
+	s.Sqrt(f.pq)
+	f.Nbit = s.BitLen()+1
 
 	return futil.NewIntFunStub(&f)
 }
@@ -101,7 +107,7 @@ func (f *Fun) MaxLen() int {
 
 //Constraint attempts to constrain hint possibly using a copy of pre to do this
 func (f *Fun) Constraint(pre TryData, hint *big.Int) (valid bool) {
-	if hint.Cmp(big.NewInt(2000)) > 0 {
+	if hint.Cmp(f.pMin) > 0 {
 		valid = true
 		if hint.Bit(0) == 0 {
 			hint.SetBit(hint, 0, 1)
@@ -120,6 +126,7 @@ func (f *Fun) About() string {
 	s += fmt.Sprintf("p= %v\n", f.p)
 	s += fmt.Sprintf("q= %v\n", f.q)
 	s += fmt.Sprintf("number of bits %d\n", f.Nbit)
+	s += fmt.Sprintf("smallest factor to choose = %v\n",f.pMin)
 	return s
 }
 
@@ -130,16 +137,16 @@ func (f *Fun) Delete(i int) bool { return false }
 method Create().
 */
 type Creator struct {
-	p, q *big.Int
+	p, q, pMin *big.Int
 }
 
 // NewCreator just returns a Creator of Fun with primes p,q.
-func NewCreator(p, q *big.Int) *Creator {
-	c := Creator{p, q}
+func NewCreator(p, q, pMin *big.Int) *Creator {
+	c := Creator{p, q, pMin}
 	return &c
 }
 
 // Create creates an instance
 func (c *Creator) Create(sd int64) setpso.Fun {
-	return New(c.p, c.q)
+	return New(c.p, c.q , c.pMin)
 }

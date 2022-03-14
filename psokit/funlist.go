@@ -42,20 +42,23 @@ func (man *ManPso) CreateFun(name string) (f Fun) {
 		f = subsetsum.New(100, 20, fsd)
 	case "simplefactor-30":
 		// use this to show that the prime factorisation is still not easy
-		var p, q big.Int
+		var p, q,pMin big.Int
 		p.SetString("1059652519", 0)
 		q.SetString("929636291", 0)
-		f = simplefactor.New(&p, &q)
+		pMin.SetString("50000000",0)
+		f = simplefactor.New(&p, &q, &pMin)
 	case "simplefactor-25":
-		var p, q big.Int
+		var p, q ,pMin big.Int
 		p.SetString("30158671", 0)
 		q.SetString("26919701", 0)
-		f = simplefactor.New(&p, &q)
+		pMin.SetString("500000",0)
+		f = simplefactor.New(&p, &q,&pMin)
 	case "simplefactor-16":
-		var p, q big.Int
+		var p, q, pMin big.Int
 		p.SetString("51647", 0)
 		q.SetString("97859", 0)
-		f = simplefactor.New(&p, &q)
+		pMin.SetString("20000",0)
+		f = simplefactor.New(&p, &q,&pMin)
 	default:
 		fc := man.addedFun[name]
 		if fc != nil {
@@ -74,7 +77,7 @@ func (man *ManPso) CreateFun(name string) (f Fun) {
 }
 
 /*
-this is done during the initialisation of man in New().
+this is done during the initialization of man in New().
 it is done here to give easy comparison with the above list
 */
 func (man *ManPso) loadFunDescription() {
